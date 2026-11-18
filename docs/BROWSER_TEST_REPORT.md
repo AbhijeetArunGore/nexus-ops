@@ -16,16 +16,16 @@ Automated end-to-end browser testing was executed against a live headless Chromi
 
 | Test ID | Test Scope | Status | Latency | Key Observed Verification |
 | :--- | :--- | :---: | :---: | :--- |
-| **Test 1** | Application Startup & Health | **PASSED** | 3442.51 ms | Backend status UP, DB CONNECTED, Environment: development |
-| **Test 2** | Main Navigation (8 Pages) | **PASSED** | 1639.58 ms | All 8 operational views loaded directly and rendered expected headers without crashes. |
-| **Test 3** | Log File Upload & Ingestion | **PASSED** | 474.26 ms | File uploaded, parsed, severity computed, navigated to /incidents/43c67b48-793f-4b01-ad2f-e373bac1d440. |
-| **Test 4** | Copy-Paste Telemetry Analysis | **PASSED** | 305.09 ms | Pasted log parsed into structured events, deterministic severity score rendered. |
-| **Test 5** | Payment Reliability Lab Execution | **PASSED** | 263.53 ms | 8 scenarios listed; Scenario 04 executed live via REST, evaluated as CRITICAL with DB pool rationale. |
-| **Test 6** | Incident Workspace Tab Navigation | **PASSED** | 1164.99 ms | All forensic tabs (Timeline, Graph, Blast Radius, What Am I Missing, etc.) render verified data. |
-| **Test 7** | Ops Knowledge Copilot (Dual Mode) | **PASSED** | 615.1 ms | Learning mode answered concept queries; Engineering mode returned pg_stat_activity diagnostic procedures. |
-| **Test 8** | AI Fallback Transparency | **PASSED** | 185.92 ms | System operates with 100% functionality without Gemini key; deterministic fallback identified. |
-| **Test 9** | Persistence & Feedback Submission | **PASSED** | 1152.76 ms | Incident reloaded after browser refresh; status updated to IDENTIFIED; SRE post-mortem feedback persisted. |
-| **Test 10** | Graceful Failure & Edge Case Handling | **PASSED** | 388.02 ms | Empty log paste disabled client-side and returns 400 from API; non-existent incident displays clean 'Incident not found' state. |
+| **Test 1** | Application Startup & Health | **PASSED** | 3644.08 ms | Backend status UP, DB CONNECTED, Environment: development |
+| **Test 2** | Main Navigation (8 Pages) | **PASSED** | 785.95 ms | All 8 operational views loaded directly and rendered expected headers without crashes. |
+| **Test 3** | Log File Upload & Ingestion | **PASSED** | 493.05 ms | File uploaded, parsed, severity computed, navigated to /incidents/12894aff-3318-46d8-bd4d-649197f13c8a. |
+| **Test 4** | Copy-Paste Telemetry Analysis | **PASSED** | 312.51 ms | Pasted log parsed into structured events, deterministic severity score rendered. |
+| **Test 5** | Payment Reliability Lab Execution | **PASSED** | 235.65 ms | 8 scenarios listed; Scenario 04 executed live via REST, evaluated as CRITICAL with DB pool rationale. |
+| **Test 6** | Incident Workspace Tab Navigation | **PASSED** | 722.83 ms | All forensic tabs (Timeline, Graph, Blast Radius, What Am I Missing, etc.) render verified data. |
+| **Test 7** | Ops Knowledge Copilot (Dual Mode) | **PASSED** | 308.58 ms | Learning mode answered concept queries; Engineering mode returned pg_stat_activity diagnostic procedures. |
+| **Test 8** | AI Fallback Transparency | **PASSED** | 193.59 ms | System operates with 100% functionality without Gemini key; deterministic fallback identified. |
+| **Test 9** | Persistence & Feedback Submission | **PASSED** | 1061.1 ms | Incident reloaded after browser refresh; status updated to IDENTIFIED; SRE post-mortem feedback persisted. |
+| **Test 10** | Graceful Failure & Edge Case Handling | **PASSED** | 193.92 ms | Empty log paste disabled client-side and returns 400 from API; non-existent incident displays clean 'Incident not found' state. |
 
 ## 3. Verified Browser Workflows
 1. **Full Ingestion Lifecycle:** Upload of synthetic `.log` files and paste of multi-service telemetry both parse into normalized events, mask card/CVV secrets, extract token fingerprints, and redirect to the Incident Workspace.
