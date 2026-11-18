@@ -1,25 +1,69 @@
 """
 Log Normalization Engine (Module 2)
-Parses heterogeneous log formats (JSON, JSONL, Java Log4j/Logback, Python stack traces, HTTP logs)
-into a structured LogEvent schema. Includes multiline stack trace coalescing.
+Parses heterogeneous log formats:
+- Structured JSON and JSONL records
+- Pretty-printed multiline JSON arrays
+- RFC 4180 CSV logs with headers (timestamp, service, level, message, etc.)
+- Java Log4j / Logback / Spring logs
+- Python Tracebacks and multi-line exception blocks
+- Syslog / Nginx access and error logs
+- Generic application logs with service inference
+
+Engineering Principles:
+- Unknown logs never default to 'payment-api'. Service extraction follows strict precedence:
+  1. JSON fields (service, app, logger, component, container_name)
+  2. Bracketed service identifiers [service-name]
+  3. Key-value service=X or app=X
+  4. Java/Python logger namespaces (com.pinelabs.payments.X -> payments)
+  5. Fallback to 'unknown-service'.
+- Includes true CSV parsing and multiline JSON array parsing.
 """
 import re
 import json
+import csv
+import io
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from app.services.redaction import redact_text
 
-# Common regex patterns for text logs
-ISO_TIMESTAMP_PATTERN = re.compile(r'\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?')
-LEVEL_PATTERN = re.compile(r'\b(CRITICAL|FATAL|ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\b', re.IGNORECASE)
-TRANSACTION_ID_PATTERN = re.compile(r'\b(?:SYN-)?TXN-[A-Za-z0-9\-_]+\b|\b(?:order|txn|trans)[_-]?id[:=\s]+([A-Za-z0-9\-_]+)', re.IGNORECASE)
-TRACE_ID_PATTERN = re.compile(r'\btrace[_-]?id[:=\s]+([A-Za-z0-9\-]+)|\b[a-f0-9]{32}\b', re.IGNORECASE)
-HTTP_STATUS_PATTERN = re.compile(r'\bHTTP[/12\.]*\s+([1-5]\d{2})\b|\bstatus[:=\s]+([1-5]\d{2})\b', re.IGNORECASE)
-SERVICE_NAME_PATTERN = re.compile(r'\[([a-zA-Z0-9\-_]+(?:-service|-api|-orchestrator|-connector|-dispatcher|-engine)?)\]|\bservice[:=\s]+([a-zA-Z0-9\-_]+)', re.IGNORECASE)
-ERROR_TYPE_PATTERN = re.compile(r'\b([A-Z][a-zA-Z0-9_]*(?:Exception|Error|Timeout|Exhaustion|Failure))\b')
-
-# Continuation line indicators for multiline traces
-STACK_TRACE_LINE_PATTERN = re.compile(r'^\s+(?:at\s+|File\s+|Caused by:|\.\.\.\s*\d+\s+more|\^|raise\s+)', re.IGNORECASE)
+# Regex patterns for text logs
+ISO_TIMESTAMP_PATTERN = re.compile(
+    r'\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?'
+)
+SYSLOG_TIMESTAMP_PATTERN = re.compile(
+    r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b',
+    re.IGNORECASE
+)
+LEVEL_PATTERN = re.compile(
+    r'\b(CRITICAL|FATAL|ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\b',
+    re.IGNORECASE
+)
+TRANSACTION_ID_PATTERN = re.compile(
+    r'\b(?:SYN-)?TXN-[A-Za-z0-9\-_]+\b|\b(?:order|txn|trans)[_-]?id[:=\s]+([A-Za-z0-9\-_]+)',
+    re.IGNORECASE
+)
+TRACE_ID_PATTERN = re.compile(
+    r'\btrace[_-]?id[:=\s]+([A-Za-z0-9\-_]+)|\b(tr-[A-Za-z0-9\-_]+)\b|\b[a-f0-9]{32}\b',
+    re.IGNORECASE
+)
+HTTP_STATUS_PATTERN = re.compile(
+    r'\bHTTP[/12\.]*\s+([1-5]\d{2})\b|\bstatus[:=\s]+([1-5]\d{2})\b',
+    re.IGNORECASE
+)
+SERVICE_NAME_PATTERN = re.compile(
+    r'\[([a-zA-Z0-9\-_]+)\]|\b(?:service|app|component|container)[:=\s]+([a-zA-Z0-9\-_]+)',
+    re.IGNORECASE
+)
+JAVA_LOGGER_PATTERN = re.compile(
+    r'\b(?:com|org|io|net|in)\.([a-zA-Z0-9\-_]+)\.([a-zA-Z0-9\-_]+)\.([A-Z][a-zA-Z0-9]+)\b'
+)
+ERROR_TYPE_PATTERN = re.compile(
+    r'\b([A-Z][a-zA-Z0-9_]*(?:Exception|Error|Timeout|Exhaustion|Failure))\b'
+)
+STACK_TRACE_LINE_PATTERN = re.compile(
+    r'^\s+(?:at\s+|File\s+|Caused by:|\.\.\.\s*\d+\s+more|\^|raise\s+)',
+    re.IGNORECASE
+)
 
 
 def parse_timestamp(ts_str: Optional[str]) -> Optional[datetime]:
@@ -35,18 +79,13 @@ def parse_timestamp(ts_str: Optional[str]) -> Optional[datetime]:
 
 
 def is_continuation_line(line: str) -> bool:
-    """
-    Determines if a line is a stack trace continuation of the previous log entry.
-    """
+    """Determines if a line is a stack trace continuation of the previous log entry."""
     if not line:
         return False
-    # If line starts with standard timestamp, it is a new log entry
     if ISO_TIMESTAMP_PATTERN.match(line):
         return False
-    # If line starts with JSON object, it is a new entry
     if line.strip().startswith("{") and line.strip().endswith("}"):
         return False
-    # Check for stack trace indentations or indicators
     if STACK_TRACE_LINE_PATTERN.match(line):
         return True
     if line.startswith("    ") or line.startswith("\t"):
@@ -54,68 +93,168 @@ def is_continuation_line(line: str) -> bool:
     return False
 
 
-def coalesce_multiline_logs(lines: List[str]) -> List[tuple[int, str]]:
-    """
-    Coalesces multiline stack traces into single logical log strings.
-    Returns: list of (line_number, combined_log_string)
-    """
-    coalesced: List[tuple[int, str]] = []
+def coalesce_multiline_logs(lines: List[str]) -> List[Tuple[int, str]]:
+    """Coalesces multiline stack traces into single logical log strings."""
+    coalesced: List[Tuple[int, str]] = []
+    current_entry: List[str] = []
     current_line_no = 1
-    current_buffer: List[str] = []
 
     for idx, raw_line in enumerate(lines, start=1):
-        stripped = raw_line.rstrip()
-        if not stripped:
+        line = raw_line.rstrip()
+        if not line:
             continue
 
-        if is_continuation_line(stripped) and current_buffer:
-            # Append continuation line to current log entry
-            current_buffer.append(stripped.strip())
+        if is_continuation_line(line) and current_entry:
+            current_entry.append(line)
         else:
-            # Flush existing buffer
-            if current_buffer:
-                coalesced.append((current_line_no, "\n".join(current_buffer)))
+            if current_entry:
+                coalesced.append((current_line_no, "\n".join(current_entry)))
+            current_entry = [line]
             current_line_no = idx
-            current_buffer = [stripped]
 
-    # Flush last buffer
-    if current_buffer:
-        coalesced.append((current_line_no, "\n".join(current_buffer)))
+    if current_entry:
+        coalesced.append((current_line_no, "\n".join(current_entry)))
 
     return coalesced
 
 
-def normalize_log_line(raw_line: str, line_no: int, index: int) -> Dict[str, Any]:
+def try_parse_csv(content: str) -> Optional[List[Dict[str, Any]]]:
     """
-    Parses a single log entry into the standard LogEvent schema.
+    Attempts to parse content as RFC 4180 CSV with headers.
+    Returns normalized event dicts if headers contain log signals.
     """
-    event_id = f"EVT-{index:04d}"
-    line_clean = raw_line.strip()
-    if not line_clean:
-        return {}
+    try:
+        sample = content[:4096]
+        if "," not in sample and "\t" not in sample:
+            return None
 
-    # 1. Attempt JSON parsing
+        reader = csv.DictReader(io.StringIO(content))
+        if not reader.fieldnames:
+            return None
+
+        fields_lower = [f.lower().strip() for f in reader.fieldnames if f]
+        has_log_fields = any(f in fields_lower for f in ["message", "msg", "log", "error", "level", "service"])
+        if not has_log_fields:
+            return None
+
+        events = []
+        for idx, row in enumerate(reader, start=2):
+            msg_val = row.get("message") or row.get("msg") or row.get("log") or row.get("error") or str(row)
+            redacted_msg, was_redacted = redact_text(msg_val)
+
+            ts_raw = row.get("timestamp") or row.get("time") or row.get("date") or row.get("@timestamp")
+            parsed_ts = parse_timestamp(ts_raw)
+
+            svc_val = row.get("service") or row.get("app") or row.get("component") or "unknown-service"
+            level_val = (row.get("level") or row.get("log_level") or "INFO").upper()
+            if level_val == "WARNING":
+                level_val = "WARN"
+
+            status_raw = row.get("http_status") or row.get("status")
+            status_int = int(status_raw) if status_raw and str(status_raw).isdigit() else None
+
+            events.append({
+                "event_id": f"EVT-{idx:04d}",
+                "timestamp": parsed_ts,
+                "service": str(svc_val).lower(),
+                "environment": "simulated",
+                "log_level": level_val,
+                "message": redacted_msg,
+                "error_type": row.get("error_type") or row.get("exception"),
+                "trace_id": row.get("trace_id") or row.get("traceId"),
+                "span_id": row.get("span_id"),
+                "transaction_id": row.get("transaction_id") or row.get("txn_id"),
+                "endpoint": row.get("endpoint") or row.get("path"),
+                "http_status": status_int,
+                "duration_ms": float(row["duration_ms"]) if row.get("duration_ms") and str(row.get("duration_ms")).replace('.', '', 1).isdigit() else None,
+                "dependency": row.get("dependency"),
+                "redaction_applied": was_redacted,
+                "line_number": idx
+            })
+        return events if events else None
+    except Exception:
+        return None
+
+
+def try_parse_json_array(content: str) -> Optional[List[Dict[str, Any]]]:
+    """
+    Attempts to parse entire content as a top-level JSON array of log objects.
+    """
+    clean = content.strip()
+    if clean.startswith("[") and clean.endswith("]"):
+        try:
+            arr = json.loads(clean)
+            if isinstance(arr, list) and arr and isinstance(arr[0], dict):
+                events = []
+                for idx, data in enumerate(arr, start=1):
+                    msg = data.get("message") or data.get("msg") or data.get("log") or json.dumps(data)
+                    redacted_msg, was_redacted = redact_text(msg)
+                    ts_raw = data.get("timestamp") or data.get("time") or data.get("@timestamp")
+                    parsed_ts = parse_timestamp(ts_raw)
+
+                    svc = data.get("service") or data.get("app") or data.get("logger") or "unknown-service"
+                    lvl = (data.get("level") or data.get("log_level") or "INFO").upper()
+                    if lvl == "WARNING":
+                        lvl = "WARN"
+
+                    status = data.get("http_status") or data.get("status")
+                    events.append({
+                        "event_id": f"EVT-{idx:04d}",
+                        "timestamp": parsed_ts,
+                        "service": str(svc).lower(),
+                        "environment": "simulated",
+                        "log_level": lvl,
+                        "message": redacted_msg,
+                        "error_type": data.get("error_type") or data.get("exception"),
+                        "trace_id": data.get("trace_id") or data.get("traceId"),
+                        "span_id": data.get("span_id"),
+                        "transaction_id": data.get("transaction_id") or data.get("txn_id"),
+                        "endpoint": data.get("endpoint") or data.get("path"),
+                        "http_status": int(status) if status and str(status).isdigit() else None,
+                        "duration_ms": float(data.get("duration_ms") or data.get("latency_ms", 0)) if (data.get("duration_ms") or data.get("latency_ms")) else None,
+                        "dependency": data.get("dependency"),
+                        "redaction_applied": was_redacted,
+                        "line_number": idx
+                    })
+                return events
+        except Exception:
+            return None
+    return None
+
+
+def normalize_log_line(line: str, line_no: int, event_idx: int) -> Dict[str, Any]:
+    """
+    Normalizes a single text log line, Syslog, or individual JSONL record.
+    Never defaults service to 'payment-api' unless indicated by log evidence.
+    """
+    line_clean = line.strip()
+
+    # 1. JSON / JSONL record parsing
     if line_clean.startswith("{") and line_clean.endswith("}"):
         try:
             data = json.loads(line_clean)
-            msg = str(data.get("message") or data.get("msg") or data.get("log") or json.dumps(data))
+            msg = data.get("message") or data.get("msg") or data.get("log") or line_clean
             redacted_msg, was_redacted = redact_text(msg)
 
-            ts_str = data.get("timestamp") or data.get("time") or data.get("@timestamp")
-            parsed_ts = parse_timestamp(str(ts_str)) if ts_str else None
+            ts_raw = data.get("timestamp") or data.get("time") or data.get("@timestamp")
+            parsed_ts = parse_timestamp(ts_raw)
 
-            status = data.get("http_status") or data.get("status_code") or data.get("status")
-            try:
-                status_int = int(status) if status is not None else None
-            except Exception:
-                status_int = None
+            status = data.get("http_status") or data.get("status")
+            status_int = int(status) if status and str(status).isdigit() else None
+
+            # Service inference precedence: service -> app -> component -> logger -> container -> unknown-service
+            svc = data.get("service") or data.get("app") or data.get("component") or data.get("logger") or data.get("container") or "unknown-service"
+
+            lvl = str(data.get("level") or data.get("log_level") or "INFO").upper()
+            if lvl == "WARNING":
+                lvl = "WARN"
 
             return {
-                "event_id": event_id,
+                "event_id": f"EVT-{event_idx:04d}",
                 "timestamp": parsed_ts,
-                "service": str(data.get("service") or data.get("app") or "payment-api").lower(),
+                "service": str(svc).lower(),
                 "environment": "simulated",
-                "log_level": str(data.get("level") or data.get("log_level") or "INFO").upper(),
+                "log_level": lvl,
                 "message": redacted_msg,
                 "error_type": data.get("error_type") or data.get("exception"),
                 "trace_id": data.get("trace_id") or data.get("traceId"),
@@ -146,54 +285,43 @@ def normalize_log_line(raw_line: str, line_no: int, index: int) -> Dict[str, Any
     elif log_level == "FATAL":
         log_level = "CRITICAL"
 
-    # Service extraction
-    service = "payment-api"
+    # Service extraction with strict precedence (Never default to payment-api)
+    service = "unknown-service"
     service_match = SERVICE_NAME_PATTERN.search(line_clean)
     if service_match:
-        service = (service_match.group(1) or service_match.group(2) or "payment-api").lower()
+        service = (service_match.group(1) or service_match.group(2) or "unknown-service").lower()
     else:
-        for s in ["payment-api", "payment-orchestrator", "bank-connector", "webhook-dispatcher", "settlement-engine", "order-db"]:
-            if s in line_clean.lower():
-                service = s
-                break
+        # Check Java logger pattern: com.pinelabs.service_name.Class
+        java_match = JAVA_LOGGER_PATTERN.search(line_clean)
+        if java_match:
+            service = java_match.group(2).lower()
+        else:
+            # Check known synthetic service tokens if present explicitly
+            for s in ["payment-api", "payment-orchestrator", "bank-connector", "webhook-dispatcher", "settlement-engine", "order-db", "customer-checkout", "deployment-manager"]:
+                if s in line_clean.lower():
+                    service = s
+                    break
 
     # Transaction ID
-    txn_id = None
     txn_match = TRANSACTION_ID_PATTERN.search(line_clean)
-    if txn_match:
-        txn_id = txn_match.group(0) if txn_match.group(0).startswith("SYN-") or txn_match.group(0).startswith("TXN-") else txn_match.group(1)
+    transaction_id = txn_match.group(0) if txn_match else None
+    if transaction_id and "=" in transaction_id:
+        transaction_id = transaction_id.split("=")[-1].strip()
 
     # Trace ID
-    trace_id = None
     trace_match = TRACE_ID_PATTERN.search(line_clean)
-    if trace_match:
-        trace_id = trace_match.group(1) if trace_match.group(1) else trace_match.group(0)
+    trace_id = trace_match.group(1) or trace_match.group(2) if trace_match else None
 
     # HTTP Status
-    http_status = None
-    http_match = HTTP_STATUS_PATTERN.search(line_clean)
-    if http_match:
-        try:
-            http_status = int(http_match.group(1) or http_match.group(2))
-        except Exception:
-            pass
+    status_match = HTTP_STATUS_PATTERN.search(line_clean)
+    http_status = int(status_match.group(1) or status_match.group(2)) if status_match else None
 
-    # Error Type
-    error_type = None
-    err_match = ERROR_TYPE_PATTERN.search(line_clean)
-    if err_match:
-        error_type = err_match.group(1)
-    elif "nullpointerexception" in line_clean.lower():
-        error_type = "NullPointerException"
-    elif "timeout" in line_clean.lower():
-        error_type = "TimeoutError"
-    elif ("database" in line_clean.lower() or "pg_" in line_clean.lower() or "hikaripool" in line_clean.lower() or "postgres" in line_clean.lower() or "mysql" in line_clean.lower() or "order-db" in service or "connection slots" in line_clean.lower()) and ("connection" in line_clean.lower() or "slot" in line_clean.lower() or "pool" in line_clean.lower()):
-        error_type = "DatabaseConnectionError"
-    elif "webhook" in line_clean.lower() and ("refused" in line_clean.lower() or "failed" in line_clean.lower()):
-        error_type = "WebhookDeliveryError"
+    # Error type
+    error_match = ERROR_TYPE_PATTERN.search(line_clean)
+    error_type = error_match.group(1) if error_match else None
 
     return {
-        "event_id": event_id,
+        "event_id": f"EVT-{event_idx:04d}",
         "timestamp": parsed_ts,
         "service": service,
         "environment": "simulated",
@@ -202,7 +330,7 @@ def normalize_log_line(raw_line: str, line_no: int, index: int) -> Dict[str, Any
         "error_type": error_type,
         "trace_id": trace_id,
         "span_id": None,
-        "transaction_id": txn_id,
+        "transaction_id": transaction_id,
         "endpoint": None,
         "http_status": http_status,
         "duration_ms": None,
@@ -212,17 +340,31 @@ def normalize_log_line(raw_line: str, line_no: int, index: int) -> Dict[str, Any
     }
 
 
-def normalize_log_stream(content: str) -> List[Dict[str, Any]]:
+def normalize_log_stream(raw_content: str) -> List[Dict[str, Any]]:
     """
-    Coalesces multiline traces and parses each entry into the normalized schema.
+    Master ingestion pipeline parsing raw content into normalized LogEvent dictionaries.
+    Supports CSV, JSON arrays, and coalesced multiline text/JSONL.
     """
-    lines = content.splitlines()
-    coalesced_entries = coalesce_multiline_logs(lines)
-    events = []
-    idx = 1
-    for line_no, entry_text in coalesced_entries:
-        parsed = normalize_log_line(entry_text, line_no, idx)
-        if parsed:
-            events.append(parsed)
-            idx += 1
+    if not raw_content or not raw_content.strip():
+        return []
+
+    # 1. Check for top-level JSON Array
+    json_arr_events = try_parse_json_array(raw_content)
+    if json_arr_events:
+        return json_arr_events
+
+    # 2. Check for CSV format
+    csv_events = try_parse_csv(raw_content)
+    if csv_events:
+        return csv_events
+
+    # 3. Standard text / multiline coalesced stream
+    lines = raw_content.splitlines()
+    coalesced = coalesce_multiline_logs(lines)
+
+    events: List[Dict[str, Any]] = []
+    for idx, (line_no, line_text) in enumerate(coalesced, start=1):
+        evt = normalize_log_line(line_text, line_no=line_no, event_idx=idx)
+        events.append(evt)
+
     return events
