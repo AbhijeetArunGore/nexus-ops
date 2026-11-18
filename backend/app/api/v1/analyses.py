@@ -191,7 +191,14 @@ async def upload_log_file(file: UploadFile = File(...), title: Optional[str] = F
     Ingests uploaded log file (.log, .txt, .json, .jsonl, .csv).
     Validates magic bytes to prevent binary executable uploads.
     """
-    # 1. Extension validation
+    # 1. Read first chunk for magic bytes validation
+    chunk = await file.read(512)
+    if not chunk or len(chunk.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    validate_not_executable(chunk)
+
+    # 2. Extension validation
     allowed_extensions = (".log", ".txt", ".json", ".jsonl", ".csv")
     filename = (file.filename or "").lower()
     if not any(filename.endswith(ext) for ext in allowed_extensions):
@@ -200,16 +207,24 @@ async def upload_log_file(file: UploadFile = File(...), title: Optional[str] = F
             detail=f"Unsupported file format '{file.filename}'. Permitted formats: .log, .txt, .json, .jsonl, .csv"
         )
 
-    # 2. Read bytes and validate magic bytes
-    try:
-        raw_bytes = await file.read()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"File read failed: {str(e)}")
+    # 3. Stream remaining content with bounded size enforcement
+    max_size = settings.MAX_UPLOAD_SIZE_BYTES
+    bytes_read = len(chunk)
+    chunks = [chunk]
 
-    if not raw_bytes or len(raw_bytes.strip()) == 0:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    while True:
+        more = await file.read(64 * 1024)
+        if not more:
+            break
+        bytes_read += len(more)
+        if bytes_read > max_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Payload exceeds maximum permitted size of {max_size // (1024*1024)}MB."
+            )
+        chunks.append(more)
 
-    validate_not_executable(raw_bytes)
+    raw_bytes = b"".join(chunks)
 
     # 3. Decode UTF-8
     try:

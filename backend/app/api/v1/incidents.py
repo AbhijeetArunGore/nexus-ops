@@ -114,7 +114,14 @@ def update_incident_status(incident_id: str, payload: StatusUpdateRequest, db: S
         inc.resolved_at = datetime.now(timezone.utc)
 
     db.commit()
-    return {"success": True, "incident_id": inc.id, "status": inc.status}
+    db.refresh(inc)
+    return {
+        "success": True,
+        "incident_id": inc.id,
+        "status": inc.status,
+        "resolved_at": inc.resolved_at.isoformat() if inc.resolved_at else None,
+        "updated_at": inc.updated_at.isoformat() if inc.updated_at else None
+    }
 
 
 @router.post("/{incident_id}/investigate")
@@ -124,7 +131,13 @@ async def trigger_investigation(incident_id: str, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Incident not found.")
 
     res = await run_incident_investigation(inc, db)
-    return {"success": True, "investigation": res}
+    return {
+        "success": True,
+        "incident_id": inc.id,
+        "incident_number": inc.incident_number,
+        "investigation": res,
+        "primary_hypothesis": res.get("primary_hypothesis", {})
+    }
 
 
 @router.get("/{incident_id}/timeline")
