@@ -53,6 +53,19 @@ def build_payment_topology() -> nx.DiGraph:
     return G
 
 
+def get_synthetic_topology() -> nx.DiGraph:
+    """Alias for build_payment_topology."""
+    return build_payment_topology()
+
+
+def get_service_dependencies(service_name: str) -> List[str]:
+    """Returns direct downstream dependencies that service_name calls."""
+    G = build_payment_topology()
+    if service_name in G:
+        return list(G.successors(service_name))
+    return []
+
+
 def compute_blast_radius(incident_id: str, events: List[Dict[str, Any]]) -> BlastRadiusResponse:
     """
     Calculates Observed Impact vs Potential Blast Radius with cycle-safe BFS traversal.
@@ -99,7 +112,7 @@ def compute_blast_radius(incident_id: str, events: List[Dict[str, Any]]) -> Blas
         elif node in potential_exposed:
             status = "POTENTIAL_BLAST_RADIUS"
         else:
-            status = "HEALTHY"
+            status = "NO_ERRORS_OBSERVED"
 
         nodes.append(BlastRadiusNode(
             service=node,
@@ -116,10 +129,12 @@ def compute_blast_radius(incident_id: str, events: List[Dict[str, Any]]) -> Blas
             relationship=data.get("relationship", "DEPENDS_ON")
         ))
 
+    exposed_list = sorted(list(potential_exposed))
     return BlastRadiusResponse(
         incident_id=incident_id,
         observed_services=sorted(list(observed_services)),
-        exposed_downstream_services=sorted(list(potential_exposed)),
+        exposed_upstream_services=exposed_list,
+        exposed_downstream_services=exposed_list,
         nodes=nodes,
         edges=edges
     )

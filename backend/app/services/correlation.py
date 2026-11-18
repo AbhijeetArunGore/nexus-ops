@@ -1,10 +1,15 @@
 """
 Alert Correlation Engine (Module 6)
-Correlates multi-service errors into cohesive incident groups based on shared trace IDs,
-shared transaction IDs, topological dependency relationships, and temporal proximity.
+Correlates multi-service errors into cohesive incident groups based on:
+1. Shared transaction IDs (Priority 1)
+2. Shared trace IDs (Priority 2)
+3. Configured topological dependency paths (Priority 3)
+4. Common error fingerprints / dependencies (Priority 4)
+5. Temporal proximity (Priority 5)
 """
 from typing import List, Dict, Any, Set
 from collections import defaultdict
+from app.services.topology import get_synthetic_topology, get_service_dependencies
 
 
 def correlate_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -40,7 +45,6 @@ def correlate_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     for trace_id, event_ids in trace_map.items():
         if len(event_ids) > 1:
-            # Check if not already covered by transaction group
             correlated_groups.append({
                 "correlation_type": "SHARED_TRACE",
                 "strength": "HIGH",
@@ -48,46 +52,58 @@ def correlate_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "event_ids": event_ids
             })
 
-    # 3. Correlate by Dependency Cascade (Strength: MEDIUM)
-    # E.g. If bank-connector fails with timeouts and payment-api shows timeouts, group them as cascade
-    failing_services: Set[str] = {e.get("service") for e in error_events}
-    if "bank-connector" in failing_services and "payment-api" in failing_services:
-        has_api_timeout = any(
-            "timeout" in e.get("message", "").lower()
-            or "504" in e.get("message", "")
-            or ((e.get("http_status") or 0) >= 500)
-            for e in error_events if e.get("service") == "payment-api"
-        )
-        if has_api_timeout:
-            cascade_events = [e["event_id"] for e in error_events if e.get("service") in ["bank-connector", "payment-api"]]
+    # 3. Correlate by Configured Topology & Dependency Cascade (Strength: MEDIUM)
+    # Check if failing services have direct or transitive dependency relationships
+    failing_services: Set[str] = {e.get("service") for e in error_events if e.get("service")}
+    covered_cascade_pairs = set()
+
+    for caller_service in failing_services:
+        direct_deps = set(get_service_dependencies(caller_service))
+        failing_deps = direct_deps.intersection(failing_services)
+
+        for dep_service in failing_deps:
+            pair_key = (caller_service, dep_service)
+            if pair_key in covered_cascade_pairs:
+                continue
+            covered_cascade_pairs.add(pair_key)
+
+            caller_events = [e["event_id"] for e in error_events if e.get("service") == caller_service]
+            dep_events = [e["event_id"] for e in error_events if e.get("service") == dep_service]
+            combined_eids = (dep_events + caller_events)[:12]
+
             correlated_groups.append({
                 "correlation_type": "DEPENDENCY_CASCADE",
                 "strength": "MEDIUM",
-                "rationale": "Upstream bank-connector degradation propagating timeout cascades to client-facing payment-api.",
-                "event_ids": cascade_events[:12]
+                "rationale": (
+                    f"Configured dependency relationship '{caller_service} -> {dep_service}': "
+                    f"Downstream dependency '{dep_service}' failure propagated upstream to caller '{caller_service}'."
+                ),
+                "event_ids": combined_eids
             })
-    elif "order-db" in failing_services and "payment-orchestrator" in failing_services:
-        cascade_events = [e["event_id"] for e in error_events if e.get("service") in ["order-db", "payment-orchestrator"]]
-        correlated_groups.append({
-            "correlation_type": "DEPENDENCY_CASCADE",
-            "strength": "MEDIUM",
-            "rationale": "Database connection saturation propagating transaction abortion cascades into payment-orchestrator.",
-            "event_ids": cascade_events[:12]
-        })
 
-    # 4. Temporal Proximity Correlation (Strength: LOW)
-    # If no groups were formed and errors exist in a tight window (< 30 seconds)
+    # 4. Common Error Fingerprint Correlation (Strength: MEDIUM)
+    fingerprint_map: Dict[str, List[str]] = defaultdict(list)
+    for e in error_events:
+        fp = e.get("fingerprint")
+        if fp:
+            fingerprint_map[fp].append(e["event_id"])
+
+    for fp, eids in fingerprint_map.items():
+        if len(eids) >= 3 and not any(set(eids).issubset(set(g["event_ids"])) for g in correlated_groups):
+            correlated_groups.append({
+                "correlation_type": "REPEATED_ERROR_FINGERPRINT",
+                "strength": "MEDIUM",
+                "rationale": f"Repeated occurrences ({len(eids)}) of standardized failure fingerprint '{fp}'.",
+                "event_ids": eids[:8]
+            })
+
+    # 5. Temporal Proximity Window (Weak Fallback - only if no deterministic groups exist)
     if not correlated_groups and len(error_events) >= 2:
-        timed_events = [e for e in error_events if e.get("timestamp")]
-        if len(timed_events) >= 2:
-            timed_events.sort(key=lambda x: x["timestamp"])
-            delta = (timed_events[-1]["timestamp"] - timed_events[0]["timestamp"]).total_seconds()
-            if delta <= 60:
-                correlated_groups.append({
-                    "correlation_type": "TEMPORAL_WINDOW",
-                    "strength": "LOW",
-                    "rationale": f"Errors occurred within a compact temporal window of {int(delta)}s. Inferred potential shared trigger.",
-                    "event_ids": [e["event_id"] for e in timed_events]
-                })
+        correlated_groups.append({
+            "correlation_type": "TEMPORAL_WINDOW",
+            "strength": "LOW",
+            "rationale": f"Discrete errors observed within close temporal window ({len(error_events)} events). Causality unconfirmed.",
+            "event_ids": [e["event_id"] for e in error_events[:6]]
+        })
 
     return correlated_groups

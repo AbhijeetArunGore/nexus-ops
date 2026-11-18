@@ -21,6 +21,7 @@ class Incident(Base):
     severity = Column(String(20), nullable=False, default="MEDIUM", index=True)  # CRITICAL, HIGH, MEDIUM, LOW
     status = Column(String(20), nullable=False, default="OPEN", index=True)  # OPEN, INVESTIGATING, MITIGATED, RESOLVED, CLOSED
     customer_impact = Column(String(20), nullable=False, default="UNKNOWN")  # CONFIRMED, SUSPECTED, UNKNOWN
+    payment_outcome = Column(String(30), nullable=False, default="UNKNOWN")  # AUTHORIZATION_REQUESTED, AUTHORIZED, CAPTURED, DECLINED, FAILED, PENDING, AMBIGUOUS, UNKNOWN
     source_scenario = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
@@ -120,6 +121,9 @@ class Hypothesis(Base):
     confidence = Column(String(20), default="MEDIUM")  # HIGH, MEDIUM, LOW
     supporting_evidence_codes = Column(JSON, default=list)
     contradicting_evidence_codes = Column(JSON, default=list)
+    assumptions = Column(JSON, default=list)
+    inferences = Column(JSON, default=list)
+    unknowns = Column(JSON, default=list)
     verification_steps = Column(JSON, default=list)
     is_primary = Column(Boolean, default=False)
 

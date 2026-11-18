@@ -72,6 +72,9 @@ class HypothesisResponse(BaseModel):
     confidence: str
     supporting_evidence_codes: List[str] = []
     contradicting_evidence_codes: List[str] = []
+    assumptions: List[str] = []
+    inferences: List[str] = []
+    unknowns: List[str] = []
     verification_steps: List[str] = []
     is_primary: bool
     model_config = ConfigDict(from_attributes=True)
@@ -97,6 +100,7 @@ class SeverityRationaleItem(BaseModel):
 class SeverityDecision(BaseModel):
     severity: str  # CRITICAL, HIGH, MEDIUM, LOW
     customer_impact: str  # CONFIRMED, SUSPECTED, UNKNOWN
+    payment_outcome: str = "UNKNOWN"  # AUTHORIZATION_REQUESTED, AUTHORIZED, CAPTURED, DECLINED, FAILED, PENDING, AMBIGUOUS, UNKNOWN
     score: int
     reasons: List[SeverityRationaleItem] = []
 
@@ -108,6 +112,7 @@ class IncidentSummaryResponse(BaseModel):
     severity: str
     status: str
     customer_impact: str
+    payment_outcome: str = "UNKNOWN"
     source_scenario: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -187,7 +192,7 @@ class TelemetryGapItem(BaseModel):
 
 class BlastRadiusNode(BaseModel):
     service: str
-    status: str  # OBSERVED_IMPACT, POTENTIAL_BLAST_RADIUS, HEALTHY
+    status: str  # OBSERVED_IMPACT, POTENTIAL_BLAST_RADIUS, NO_ERRORS_OBSERVED
     depth: int
     error_count: int = 0
 
@@ -201,7 +206,8 @@ class BlastRadiusEdge(BaseModel):
 class BlastRadiusResponse(BaseModel):
     incident_id: str
     observed_services: List[str]
-    exposed_downstream_services: List[str]
+    exposed_upstream_services: List[str]
+    exposed_downstream_services: List[str]  # Backwards compatibility alias
     nodes: List[BlastRadiusNode]
     edges: List[BlastRadiusEdge]
 
