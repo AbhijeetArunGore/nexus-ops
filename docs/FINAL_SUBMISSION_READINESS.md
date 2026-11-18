@@ -14,7 +14,7 @@
 
 | Operational Capability | Verification Method | Status | Audit Findings |
 | :--- | :--- | :---: | :--- |
-| **Deterministic Rule Engine** | Pytest Unit & Integration | **VERIFIED (100%)** | 41/41 tests passing in 7.32s; 86% statement coverage. Severity scoring is 100% deterministic and decoupled from generative LLM non-determinism. |
+| **Deterministic Rule Engine** | Pytest Unit & Integration | **VERIFIED (100%)** | 42/42 tests passing in 1.42s; 86% statement coverage. Severity scoring is 100% deterministic and decoupled from generative LLM non-determinism. |
 | **Golden Scenario Conformance**| Pytest Golden Fixtures | **VERIFIED (100%)** | 8/8 payment lifecycle scenarios + 6 adversarial edge cases evaluated with 0 failures. |
 | **End-to-End User Journeys** | Playwright Browser Tests | **VERIFIED (100%)** | 10/10 user workflows verified in headless Chromium. Ingestion, 10-tab workspace, dual-mode Copilot, and persistence confirmed. |
 | **AI Answer Quality & Grounding**| Curated Category Benchmark | **VERIFIED (100%)** | 8/8 categories passing (97.5% mean recall) under four-tier grounding using `DeterministicFallbackProvider`. |

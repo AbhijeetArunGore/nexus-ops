@@ -35,7 +35,19 @@ async def ask_copilot(payload: CopilotAskRequest, incident_id: Optional[str] = N
             }
 
     provider = get_llm_provider()
+
+    # Grounding: Retrieve top matching runbooks and concepts from local knowledge base
+    from app.services.knowledge_service import search_runbooks, RUNBOOK_CATALOG
+    matched_runbooks = search_runbooks(payload.query)
+
     answer_dict = await provider.answer_copilot_query(payload.query, payload.mode, incident_context)
+
+    # Blend matched runbook references if present
+    sources = list(answer_dict.get("source_references", []))
+    for rb in matched_runbooks[:2]:
+        rb_ref = f"{rb['id']}: {rb['title']} (Synthetic SRE Runbook)"
+        if rb_ref not in sources:
+            sources.append(rb_ref)
 
     return CopilotAnswerResponse(
         query=payload.query,
@@ -44,6 +56,6 @@ async def ask_copilot(payload: CopilotAskRequest, incident_id: Optional[str] = N
         technical_details=answer_dict.get("technical_details"),
         supporting_evidence=answer_dict.get("supporting_evidence", []),
         suggested_actions=answer_dict.get("suggested_actions", []),
-        source_references=answer_dict.get("source_references", []),
+        source_references=sources,
         follow_up_questions=answer_dict.get("follow_up_questions", [])
     )

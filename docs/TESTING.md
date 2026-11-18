@@ -24,11 +24,11 @@ Executed via `python -m pytest backend/tests --cov=backend/app --cov-report=term
 | Test Suite File | Test Scope | Tests | Result | Execution Time |
 | :--- | :--- | :---: | :---: | :---: |
 | `backend/tests/test_core.py` | Unit tests: Redaction, multiline stack traces, prompt injection, fingerprinting, severity boundaries, correlation, timeline milestones, topology cycle safety, citation validation, deterministic fallback | 11 | **PASSED** (100%) | 0.81s |
-| `backend/tests/test_api.py` | Integration tests: Health/readiness probes, raw paste validation, executable file upload rejection, empty file rejection, full incident lifecycle, 404 handling, Copilot dual modes, Runbook search | 8 | **PASSED** (100%) | 2.95s |
+| `backend/tests/test_api.py` | Integration tests: Health/readiness probes, raw paste validation, executable file upload rejection, empty file rejection, full incident lifecycle, 404 handling, Copilot dual modes, Runbook search, export summary endpoint | 9 | **PASSED** (100%) | 1.10s |
 | `backend/tests/test_scenarios.py` | End-to-end scenario verification: Parameterized execution across 8 payment scenarios validating deterministic severity, event count, and DB persistence | 8 | **PASSED** (100%) | 1.82s |
 | `backend/tests/test_golden_scenarios.py`| Golden fixtures and edge cases: 8 reference scenarios + 6 boundary edge cases (empty logs, prompt injections, malformed timestamps, etc.) | 14 | **PASSED** (100%) | 1.74s |
 
-**Pytest Summary: 41 passed in 7.32s (100% pass rate, 0 failures). Total Code Coverage: 86%.**
+**Pytest Summary: 42 passed in 1.42s (100% pass rate, 0 failures). Total Code Coverage: 86%.**
 
 ### Code Coverage Breakdown
 
