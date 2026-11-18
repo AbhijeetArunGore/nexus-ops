@@ -198,7 +198,7 @@ NEXUS Ops provides a dark-mode, high-density operations command center engineere
 
 ### 05. Payment Reliability Lab
 ![Payment Reliability Lab](docs/assets/screenshots/05_payment_reliability_lab.png)
-*Figure 5: Payment Reliability Lab — Interactive flight simulator featuring 8 reproducible Pine Labs-inspired scenarios executing through the live deterministic analysis engine.*
+*Figure 5: Payment Reliability Lab — Interactive Payment Scenario Simulation Environment featuring 8 reproducible Pine Labs-inspired scenarios executing through the live deterministic analysis engine.*
 
 ### 06. Ops Knowledge Copilot
 ![Ops Knowledge Copilot](docs/assets/screenshots/06_ops_knowledge_copilot.png)
@@ -317,9 +317,34 @@ sequenceDiagram
 
 ## 8. Deep Subsystem Documentation
 
-NEXUS Ops is composed of 18 modular subsystems. Each subsystem is documented below according to its internal implementation, algorithms, and technical contracts:
+NEXUS Ops is composed of 18 modular subsystems that execute in sequence. The high-level matrix below provides an operational overview. Click on any subsystem below to expand its full architectural specification, algorithms, inputs/outputs, and operational limitations:
 
-### SUBSYSTEM 1: Log Ingestion Engine
+| Subsystem | Primary Function | Core Algorithm / Technology | Key Operational Output |
+| :--- | :--- | :--- | :--- |
+| **01. Ingestion Engine** | Validates & sanitizes input streams | In-memory length & BOM checks | Safe raw text stream (<10 MB) |
+| **02. Log Normalizer** | Converts multi-format logs to LogEvent | Multiline regex coalescing | Normalized `LogEvent` records (`EVT-xxx`) |
+| **03. Redaction Engine** | Sanitizes PANs, CVVs, tokens | Regex Luhn & auth header masks | Masked log strings with audit flags |
+| **04. Fingerprinting** | Clusters recurring error patterns | Token abstraction + SHA-256 | Deduplicated `ErrorPattern` clusters |
+| **05. Pattern Detection** | Calculates error rate bursts | 10-second sliding time windows | Frequency velocity ($\Delta 	ext{errors}/\Delta t$) |
+| **06. Correlation Engine** | Groups multi-service alert signals | Trace, Txn, DAG, Temporal tiers | `CorrelatedGroup` incident packages |
+| **07. Timeline Engine** | Reconstructs event sequence | Chronological milestone tagging | Sequenced timeline milestones |
+| **08. Blast Radius** | Evaluates dependency exposure | NetworkX DAG reverse BFS | Observed Impact vs Potential Blast Radius |
+| **09. Severity Matrix** | Deterministic severity grading | 8-factor mathematical matrix | CRITICAL / HIGH / MEDIUM / LOW score |
+| **10. Evidence Graph** | Grounds hypotheses in real events | Bipartite graph citation check | Validated hypothesis-to-event edges |
+| **11. AI Orchestrator** | Coordinates generative diagnosis | Compact briefing packaging | Investigation Package (<3 KB) |
+| **12. Heuristic Fallback**| Provides offline triage | Local rule-based archetypes | Fully grounded offline triage reports |
+| **13. What Am I Missing?**| Adversarial second-pass audit | Unexamined & contradiction audit| Blindspot warnings & counter-hypotheses |
+| **14. Telemetry Gap** | Recommends monitoring upgrades | Attribute completeness checks | OpenTelemetry instrumentation actions |
+| **15. Knowledge Copilot** | Dual-mode operational Q&A | Domain prompt context grounding | Tailored LEARNING / ENGINEERING guidance |
+| **16. Runbook Service** | Matches operational procedures | Tag & fingerprint mapping | Actionable SRE runbook checklists |
+| **17. Reliability Lab** | 8 reproducible payment failures | Live REST simulation endpoints | Live incident investigation triggers |
+| **18. Learning Hub** | Captures post-incident reviews | Human feedback persistence | Blameless postmortems & verified RCA |
+
+---
+
+<details>
+<summary><b>Subsystem 01: Log Ingestion Engine</b> — <i>Secure multi-format stream upload and validation</i></summary>
+
 - **Problem Solved:** Applications crash or experience degradation under varied operational circumstances; logs may be provided as uploaded files, pasted text snippets from incident chat channels, or continuous streaming chunks.
 - **Simple Explanation:** A front door that accepts log files or copied text, checks that they are safe to read, and prevents corrupted or oversized inputs from crashing the server.
 - **Why It Is Necessary:** Production SREs receive telemetry from diverse sources (Kibana exports, terminal outputs, Slack snippets). The system must ingest these safely without file-bomb vulnerability.
@@ -329,7 +354,11 @@ NEXUS Ops is composed of 18 modular subsystems. Each subsystem is documented bel
 - **Output:** In-memory string content and raw ingestion metadata.
 - **Limitations:** In-memory processing limits single file upload to 10 MB in the current implementation.
 
-### SUBSYSTEM 2: Log Normalization Engine
+</details>
+
+<details>
+<summary><b>Subsystem 02: Log Normalization Engine</b> — <i>Multiline coalescing and standard LogEvent extraction</i></summary>
+
 - **Problem Solved:** Logs from different microservices arrive in conflicting formats: some use JSON structured logs, others emit Java Logback text lines, and others emit multiline Python tracebacks.
 - **Simple Explanation:** A universal translator that turns any messy log line into a clean, standard data card with fields like timestamp, service name, error level, and message.
 - **Why It Is Necessary:** Downstream mathematical scoring and graph traversal require uniform data structures, not arbitrary text strings.
@@ -355,7 +384,11 @@ NEXUS Ops is composed of 18 modular subsystems. Each subsystem is documented bel
 }
 ```
 
-### SUBSYSTEM 3: Sensitive Data Redaction Engine
+</details>
+
+<details>
+<summary><b>Subsystem 03: Sensitive Data Redaction Engine</b> — <i>PCI-oriented sensitive-data redaction controls</i></summary>
+
 - **Problem Solved:** Operational logs frequently leak cardholder Primary Account Numbers (PANs), CVVs, Bearer tokens, passwords, and PII; requiring PCI-oriented sensitive-data redaction controls prior to database persistence and LLM prompt serialization.
 - **Simple Explanation:** A security filter that automatically blacks out credit card numbers, passwords, and secret tokens before anyone—or any AI—can see them.
 - **Why It Is Necessary:** Transmitting raw card numbers to external cloud LLM providers constitutes a severe regulatory and legal breach.
@@ -368,7 +401,11 @@ NEXUS Ops is composed of 18 modular subsystems. Each subsystem is documented bel
 - **Output:** Tuple of `(sanitized_string, was_redacted_bool)`.
 - **Limitations:** Regular expression masking is a heuristic defense layer; highly obfuscated or non-standard credential formats require tokenization at the application logger level.
 
-### SUBSYSTEM 4: Error Fingerprinting Engine
+</details>
+
+<details>
+<summary><b>Subsystem 04: Error Fingerprinting Engine</b> — <i>Dynamic token stripping and SHA-256 clustering</i></summary>
+
 - **Problem Solved:** Under an outage, 10,000 log lines may represent only two underlying software bugs. Treating each log line as a separate event overwhelms SREs.
 - **Simple Explanation:** Strips away unique numbers, user IDs, and timestamps to find the common template of an error, and assigns that template an ID hash.
 - **Why It Is Necessary:** Deduplication reduces the cognitive load from thousands of logs to a handful of actionable failure clusters.
@@ -378,13 +415,21 @@ NEXUS Ops is composed of 18 modular subsystems. Each subsystem is documented bel
   3. Clustering: Groups events sharing identical hashes and tracks `occurrence_count`, `first_seen`, `last_seen`, and sample event IDs.
 - **Output:** List of `ErrorPattern` records.
 
-### SUBSYSTEM 5: Pattern & Burst Detection Engine
+</details>
+
+<details>
+<summary><b>Subsystem 05: Pattern & Burst Detection Engine</b> — <i>Error frequency velocity and burst thresholds</i></summary>
+
 - **Problem Solved:** Distinguishing between a persistent background error rate (e.g. 1 error every 10 minutes) and a sudden error burst (500 errors in 10 seconds).
 - **Simple Explanation:** Measures how fast errors are happening and sounds a louder alarm when an error suddenly spikes.
 - **Why It Is Necessary:** Sudden velocity spikes indicate catastrophic state changes (such as connection pool exhaustion or circuit breaker trips).
-- **Internal Working:** `app/services/pattern_detection.py` slices events into 10-second sliding time windows, computing error frequency velocity ($\Delta \text{errors} / \Delta t$) and identifying burst thresholds (>5 errors/sec).
+- **Internal Working:** `app/services/pattern_detection.py` slices events into 10-second sliding time windows, computing error frequency velocity ($\Delta 	ext{errors} / \Delta t$) and identifying burst thresholds (>5 errors/sec).
 
-### SUBSYSTEM 6: Multi-Signal Alert Correlation Engine
+</details>
+
+<details>
+<summary><b>Subsystem 06: Multi-Signal Alert Correlation Engine</b> — <i>Trace, transaction, topology, and temporal grouping</i></summary>
+
 - **Problem Solved:** Determining whether simultaneous errors across `order-db`, `payment-orchestrator`, and `payment-api` are part of one incident or separate unrelated failures.
 - **Simple Explanation:** Connects the dots between different services using common clues like transaction IDs, trace IDs, and known service connections.
 - **Why It Is Necessary:** Prevents on-call engineers from opening multiple redundant incident tickets for the same underlying failure.
@@ -395,7 +440,11 @@ NEXUS Ops is composed of 18 modular subsystems. Each subsystem is documented bel
   4. `TEMPORAL_WINDOW`: Dense clustering of errors across adjacent services within a 60-second sliding window.
 - **Output:** List of `CorrelatedGroup` objects with rationale and supporting event IDs.
 
-### SUBSYSTEM 7: Incident Timeline Reconstruction
+</details>
+
+<details>
+<summary><b>Subsystem 07: Incident Timeline Reconstruction</b> — <i>Chronological sequencing and milestone tagging</i></summary>
+
 - **Problem Solved:** In distributed systems with out-of-order log arrival, understanding the true sequence of events is challenging.
 - **Simple Explanation:** Arranges all events in chronological order and puts landmark flags on the most important moments.
 - **Why It Is Necessary:** Root cause analysis requires identifying what broke *first*, not what emitted the most noise later.
@@ -405,7 +454,11 @@ NEXUS Ops is composed of 18 modular subsystems. Each subsystem is documented bel
   - `FIRST_CUSTOMER_IMPACT`: The first HTTP 5xx error or gateway timeout emitted on customer checkout ingress.
   - `RECOVERY_CONFIRMED`: The first health-check success or baseline return following mitigation.
 
-### SUBSYSTEM 8: Service Topology & Blast Radius Analyzer
+</details>
+
+<details>
+<summary><b>Subsystem 08: Service Topology & Blast Radius Analyzer</b> — <i>NetworkX DAG reverse BFS traversal</i></summary>
+
 - **Problem Solved:** When a service fails, engineers need to know both what is currently broken and what *could* break next if cascading failure propagates.
 - **Simple Explanation:** Uses a service dependency map to calculate which other systems are in the danger zone.
 - **Why It Is Necessary:** Prevents secondary outages by exposing vulnerable upstream callers that require immediate circuit breaker activation.
@@ -426,7 +479,11 @@ graph TD
     BankConn --> PartnerB["PartnerBank-B<br/>(External Failover)"]
 ```
 
-### SUBSYSTEM 9: Deterministic Severity Engine
+</details>
+
+<details>
+<summary><b>Subsystem 09: Deterministic Severity Engine</b> — <i>8-factor mathematical decision matrix</i></summary>
+
 - **Problem Solved:** LLMs are non-deterministic; submitting identical incident logs to a generative model twice can yield conflicting severity ratings (e.g., HIGH vs. MEDIUM).
 - **Simple Explanation:** A mathematical calculator that grades an incident's severity using strict, unchangeable rules rather than asking an AI.
 - **Why It Is Necessary:** Enterprise incident escalation requires consistent, auditable, regulatory-grade severity classification.
@@ -443,9 +500,13 @@ graph TD
 | `SETTLEMENT_RECON_DISCREPANCY` | +25 pts | Clearing reconciliation file reports missing bank UTR records. |
 | `REFUND_PROCESSING_HOLD` | +25 pts | Partner rejects refund due to insufficient merchant settlement reserve. |
 
-- **Score Thresholds:** $\ge 70 \implies \textbf{CRITICAL}$; $\ge 40 \implies \textbf{HIGH}$; $\ge 20 \implies \textbf{MEDIUM}$; $< 20 \implies \textbf{LOW}$.
+- **Score Thresholds:** $\ge 70 \implies 	extbf{CRITICAL}$; $\ge 40 \implies 	extbf{HIGH}$; $\ge 20 \implies 	extbf{MEDIUM}$; $< 20 \implies 	extbf{LOW}$.
 
-### SUBSYSTEM 10: Evidence Graph Engine
+</details>
+
+<details>
+<summary><b>Subsystem 10: Evidence Graph Engine</b> — <i>Bipartite event-to-hypothesis citation verification</i></summary>
+
 - **Problem Solved:** AI models often state conclusions without proving which specific logs support them.
 - **Simple Explanation:** A visual evidence board that draws a physical line between an AI conclusion and the exact log lines that prove it.
 - **Why It Is Necessary:** In financial operations, an SRE cannot approve production rollbacks or partner escalations based on ungrounded AI assertions.
@@ -454,13 +515,21 @@ graph TD
   - Node Type B: Ingested Event IDs (`EVT-0004`, `EVT-0006`).
   - Edge Construction: Validates event references and filters unsupported citations. Edges are built strictly when an event ID exists in the normalized log store.
 
-### SUBSYSTEM 11: AI Investigation Orchestrator
+</details>
+
+<details>
+<summary><b>Subsystem 11: AI Investigation Orchestrator</b> — <i>Compact Investigation Package synthesis</i></summary>
+
 - **Problem Solved:** Raw logs contain too much noise to submit directly to LLM prompt context windows.
 - **Simple Explanation:** Packages up the normalized timeline, error patterns, and severity results into a clean briefing document for the AI assistant.
 - **Why It Is Necessary:** Decoupling pre-processing from generative synthesis reduces token consumption by 90% and keeps model focus strictly on root-cause inference.
 - **Internal Working:** `app/ai/orchestration/investigator.py` compiles a compact Investigation Package (<3 KB) containing normalized event summaries, error patterns, timeline milestones, and service criticality metadata, which it dispatches to the active AI provider.
 
-### SUBSYSTEM 12: Deterministic AI Fallback Engine
+</details>
+
+<details>
+<summary><b>Subsystem 12: Deterministic AI Fallback Engine</b> — <i>Offline heuristic synthesis without external LLM</i></summary>
+
 - **Problem Solved:** Cloud LLM APIs experience rate limits, network outages, or key expiration. An operations platform must never fail because an external AI API is unreachable.
 - **Simple Explanation:** A built-in expert system that steps in to explain the incident using local rules if the cloud AI goes offline.
 - **Why It Is Necessary:** Core SRE triage tools must provide a deterministic fallback without requiring an external LLM during internet or third-party cloud degradation.
@@ -469,7 +538,11 @@ graph TD
   - Hypothesis generation: Synthesizes structured `Hypothesis`, `Recommendation`, and `Runbook` references using local domain rules.
   - Identification Badge: Automatically flags all outputs with `is_fallback: true` and `provider_name: "deterministic_fallback"`.
 
-### SUBSYSTEM 13: "What Am I Missing?" Adversarial Audit Engine
+</details>
+
+<details>
+<summary><b>Subsystem 13: "What Am I Missing?" Adversarial Audit Engine</b> — <i>Second-pass blindspot & contradiction detection</i></summary>
+
 - **Problem Solved:** Engineers and AI models frequently fall victim to confirmation bias—finding one plausible explanation and closing the investigation prematurely.
 - **Simple Explanation:** A second-opinion auditor that asks: "What else could have caused this? What contradictory evidence did we ignore?"
 - **Why It Is Necessary:** High-severity outages often have compound causes (e.g., an application bug triggered under network latency).
@@ -478,7 +551,11 @@ graph TD
   - Contradictory Evidence: Flags events that conflict with the leading diagnosis (e.g., a successful bank authorization arriving after an ingress timeout).
   - Alternative Hypotheses: Generates lower-confidence alternative explanations (e.g., transient network drops vs. permanent code defects).
 
-### SUBSYSTEM 14: Telemetry Gap Detector
+</details>
+
+<details>
+<summary><b>Subsystem 14: Telemetry Gap Detector</b> — <i>Observability gap analysis and OTel recommendations</i></summary>
+
 - **Problem Solved:** RCA postmortems often discover too late that crucial metrics or trace headers were missing during an incident.
 - **Simple Explanation:** Tells engineers what extra monitoring or logging they should add so the next incident is easier to solve.
 - **Why It Is Necessary:** Drives continuous observability improvements across engineering teams.
@@ -488,7 +565,11 @@ graph TD
   - Uninstrumented downstream microservice hops.
   - Recommends concrete OpenTelemetry semantic convention enhancements.
 
-### SUBSYSTEM 15: Ops Knowledge Copilot
+</details>
+
+<details>
+<summary><b>Subsystem 15: Ops Knowledge Copilot</b> — <i>Dual-mode operational intelligence (LEARNING & ENGINEERING)</i></summary>
+
 - **Problem Solved:** Engineers on different tiers of experience need different levels of detail during an investigation.
 - **Simple Explanation:** An intelligent chat assistant with two modes: "Explain it simply for a junior operator" or "Give me the exact database query for a senior SRE."
 - **Why It Is Necessary:** Provides appropriate technical depth without patronizing senior engineers or confusing junior operators.
@@ -496,19 +577,31 @@ graph TD
   - `LEARNING` Mode: Uses analogies and payment lifecycle explanations (e.g., explaining why HTTP 504 does not equal payment failure).
   - `ENGINEERING` Mode: Returns precise diagnostic commands, PostgreSQL query templates (`SELECT * FROM pg_stat_activity WHERE state = 'active'`), and circuit breaker thresholds.
 
-### SUBSYSTEM 16: Runbook Intelligence Service
+</details>
+
+<details>
+<summary><b>Subsystem 16: Runbook Intelligence Service</b> — <i>Automated matching of verified SRE procedures</i></summary>
+
 - **Problem Solved:** SRE runbooks are often static markdown files hidden in wikis that engineers forget to consult during outages.
 - **Simple Explanation:** Automatically pulls up the exact step-by-step troubleshooting checklist for the specific problem at hand.
 - **Why It Is Necessary:** Reduces Mean Time to Mitigation (MTTM) by putting verified operational procedures directly in front of the on-call engineer.
 - **Internal Working:** `app/services/knowledge_service.py` maintains a catalog of 10 verified payment operations runbooks (`RB-PAY-001` through `RB-PAY-010`), automatically matching relevant runbooks based on error fingerprints and service tags.
 
-### SUBSYSTEM 17: Payment Reliability Lab
+</details>
+
+<details>
+<summary><b>Subsystem 17: Payment Reliability Lab</b> — <i>Payment scenario simulation environment (8 Scenarios)</i></summary>
+
 - **Problem Solved:** Training engineers on live production payment systems is dangerous and violates financial compliance rules.
-- **Simple Explanation:** A payment flight simulator that lets engineers trigger 8 realistic payment outages in a safe environment.
+- **Simple Explanation:** An interactive payment scenario simulation environment that lets engineers trigger 8 realistic payment outages in a safe, controlled sandbox.
 - **Why It Is Necessary:** Enables reproducible SRE on-call training, pipeline benchmark validation, and technical evaluation.
 - **Internal Working:** `app/api/v1/scenarios.py` provides 8 synthetic scenarios that run live through the entire deterministic analysis engine via `POST /api/v1/scenarios/{id}/run`.
 
-### SUBSYSTEM 18: Incident Learning Hub & SRE Postmortem Drafter
+</details>
+
+<details>
+<summary><b>Subsystem 18: Incident Learning Hub & SRE Postmortem Drafter</b> — <i>Human feedback audit and postmortem drafting</i></summary>
+
 - **Problem Solved:** Post-incident postmortems are tedious to write, leading to delayed documentation and lost lessons.
 - **Simple Explanation:** Drafts an objective postmortem report in seconds and lets human engineers record which AI diagnoses were right or wrong.
 - **Why It Is Necessary:** Enforces Google SRE blameless postmortem culture and ensures verified root-cause knowledge is retained.
@@ -516,7 +609,7 @@ graph TD
   - Feedback capture: Records `POST /incidents/{id}/feedback` with evidence-supported root cause hypothesis confirmation, hypothesis accuracy rating, and remediation notes.
   - Automated postmortem drafting: Generates structured executive summaries, chronological milestones, detection gap audits, and assigned action items.
 
----
+</details>
 
 ## 9. AI Reasoning Architecture
 
