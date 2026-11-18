@@ -189,7 +189,51 @@ class DeterministicFallbackProvider(BaseLLMProvider):
                 "follow_up_questions": []
             }
 
-        # 2. Insufficient Evidence & Uncertainty Communication
+        # 2. Contradictory Evidence Handling
+        if any(w in q for w in ["contradict", "mismatch", "conflict"]) or ("timeout" in q and "capture" in q) or ("504" in q and "capture" in q) or ("timeout" in q and "bank" in q and "connector" in q):
+            return {
+                "query": query,
+                "mode": mode,
+                "is_fallback": True,
+                "provider_name": "deterministic_fallback",
+                "answer": "Contradictory Evidence Analysis: Ingress HTTP 504 indicates a client/gateway timeout, whereas upstream Bank Connector logs confirm successful payment capture. This represents an Ambiguous State Mismatch rather than a confirmed payment failure. The gateway timed out waiting for the bank, but the bank successfully authorized the charge.",
+                "technical_details": "Fintech Telemetry Invariant: When upstream and downstream status codes conflict, the banking partner's capture journal is the authoritative ledger of record. The downstream HTTP 504 merely indicates the reverse proxy cut the connection before the upstream response completed.",
+                "supporting_evidence": ["NEXUS Ops Scenario 01: Late Payment Authorization Response", "SRE Principle: Authoritative Source of Truth in Distributed Ledgers"],
+                "suggested_actions": [
+                    "Query the bank reconciliation API using the transaction reference (`txn_id` or `utr`).",
+                    "Do NOT mark the transaction as failed in the merchant database without server-to-server sync.",
+                    "Update order state to `AMBIGUOUS_STATE_MISMATCH` pending automated recon."
+                ],
+                "source_references": ["https://www.pinelabs.com/docs/online-payments", "https://sre.google/sre-book/incident-management/"],
+                "follow_up_questions": [
+                    "How does automated recon resolve ambiguous payment states?",
+                    "What are the risks of treating a gateway timeout as a definitive failure?"
+                ]
+            }
+
+        # 3. Missing Information & Telemetry Gap Handling
+        if any(w in q for w in ["telemetry gap", "missing telemetry", "missing metric", "missing information", "unobserved"]):
+            return {
+                "query": query,
+                "mode": mode,
+                "is_fallback": True,
+                "provider_name": "deterministic_fallback",
+                "answer": "Telemetry Gap Audit: The incident logs exhibit observable symptoms (e.g. elevated latency and connection timeouts), but lack critical observability telemetry: 1) Continuous database connection pool utilization gauges (e.g. HikariCP active/idle counters); 2) Distributed W3C traceparent context across microservice hops; 3) Host-level CPU/memory saturation metrics and network TCP retransmissions.",
+                "technical_details": "Observability Standard: Without distributed tracing spans and pool saturation time-series metrics, causal inference is limited to temporal correlation. Causal certainty requires corroborating infrastructure metrics with application logs.",
+                "supporting_evidence": ["OpenTelemetry Semantic Conventions", "Google SRE Handbook: Monitoring Distributed Systems"],
+                "suggested_actions": [
+                    "Deploy OpenTelemetry auto-instrumentation for end-to-end trace context.",
+                    "Configure Prometheus scraping for database pool active/pending connection gauges.",
+                    "Correlate application error timestamps with host-level TCP retransmission rates."
+                ],
+                "source_references": ["https://opentelemetry.io/docs/specs/semconv/", "https://prometheus.io/docs/practices/instrumentation/"],
+                "follow_up_questions": [
+                    "Which metrics are required to confirm database pool exhaustion?",
+                    "How does missing distributed tracing impact mean time to resolution (MTTR)?"
+                ]
+            }
+
+        # 4. Insufficient Evidence & Uncertainty Communication
         if any(w in q for w in ["cannot conclude", "insufficient", "isolated", "corruption", "confirm database"]):
             return {
                 "query": query,

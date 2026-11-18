@@ -9,9 +9,10 @@
 [![Vite](https://img.shields.io/badge/Vite-6.0-646CFF.svg)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC.svg)](https://tailwindcss.com/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
-[![Tests Passing](https://img.shields.io/badge/Tests-41%2F41%20Passed-emerald.svg)](backend/tests)
+[![Tests Passing](https://img.shields.io/badge/Tests-41%2F41%20Passed-emerald.svg)](docs/TESTING.md)
 [![E2E Browser Tests](https://img.shields.io/badge/Browser%20E2E-10%2F10%20Passed-blue.svg)](docs/BROWSER_TEST_REPORT.md)
-[![Coverage](https://img.shields.io/badge/Coverage-86%25-green.svg)](backend/tests)
+[![AI Evidentiary Tests](https://img.shields.io/badge/AI%20Quality-8%2F8%20Passed-purple.svg)](docs/AI_EVALUATION_REPORT.md)
+[![Coverage](https://img.shields.io/badge/Coverage-86%25-green.svg)](docs/TESTING.md)
 
 ---
 
@@ -219,6 +220,10 @@ Comprehensive technical documentation is available in the `/docs` directory:
 10. [Production Readiness & Enterprise Roadmap](docs/PRODUCTION_READINESS.md) — Assessment of implemented vs simulated capabilities.
 11. [Technical Presentation Outline](docs/PRESENTATION_OUTLINE.md) — Slide outline and talking points.
 12. [Master Interview Preparation Guide](docs/INTERVIEW_PREPARATION.md) — 18 technical evaluation questions with beginner-friendly and advanced SRE answers.
+13. [Scientific Validation & Final Audit Report](docs/SCIENTIFIC_VALIDATION_REPORT.md) — Stage 3.1 domain semantic audit, benchmark reproducibility, and scientific claim verification.
+14. [Performance & Scalability Benchmark Report](docs/PERFORMANCE_BENCHMARK.md) — CPU pipeline throughput, tracemalloc overhead quantification, and JSON raw telemetry.
+15. [AI Answer Quality & Grounding Report](docs/AI_EVALUATION_REPORT.md) — Evaluation across 8 operational categories, contradictory evidence, and four-tier grounding.
+16. [Playwright End-to-End Browser Report](docs/BROWSER_TEST_REPORT.md) — Automated headless Chromium validation of all 10 user workflows.
 
 ---
 

@@ -20,15 +20,18 @@ import urllib.request
 import json
 from playwright.sync_api import sync_playwright
 
+os.environ["NO_PROXY"] = "127.0.0.1,localhost"
+
 FRONTEND_URL = "http://127.0.0.1:5173"
 BACKEND_URL = "http://127.0.0.1:8000"
 
 
 def wait_for_url(url: str, timeout: int = 20) -> bool:
     start = time.time()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     while time.time() - start < timeout:
         try:
-            r = urllib.request.urlopen(url, timeout=2)
+            r = opener.open(url, timeout=2)
             if r.status in [200, 304]:
                 return True
         except Exception:

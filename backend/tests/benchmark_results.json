@@ -1,0 +1,165 @@
+{
+  "timestamp": "2026-11-18T10:25:47Z",
+  "environment": {
+    "os": "Windows 11 (64bit)",
+    "python": "3.12.6",
+    "processor": "Intel64 Family 6 Model 140 Stepping 2, GenuineIntel",
+    "trials_per_scale": 3,
+    "methodology": "Two-phase profiling: (1) Pure CPU execution without tracemalloc; (2) Dedicated memory delta trace"
+  },
+  "results": [
+    {
+      "lines": 100,
+      "payload_kb": 18.98,
+      "pure_cpu": {
+        "min_ms": 25.19,
+        "median_ms": 28.85,
+        "max_ms": 30.42,
+        "median_throughput_lines_sec": 3466.2,
+        "norm_ms": 27.43,
+        "fp_ms": 0.99,
+        "corr_ms": 0.08,
+        "sev_ms": 0.26,
+        "trials": [
+          {
+            "trial": 1,
+            "total_ms": 25.19,
+            "norm_ms": 24.32,
+            "fp_ms": 0.59,
+            "corr_ms": 0.04,
+            "sev_ms": 0.24,
+            "throughput_lines_sec": 3969.8
+          },
+          {
+            "trial": 2,
+            "total_ms": 28.85,
+            "norm_ms": 27.43,
+            "fp_ms": 1.03,
+            "corr_ms": 0.09,
+            "sev_ms": 0.29,
+            "throughput_lines_sec": 3466.2
+          },
+          {
+            "trial": 3,
+            "total_ms": 30.42,
+            "norm_ms": 29.09,
+            "fp_ms": 0.99,
+            "corr_ms": 0.08,
+            "sev_ms": 0.26,
+            "throughput_lines_sec": 3287.3
+          }
+        ]
+      },
+      "memory_profile": {
+        "peak_mem_kb": 118.3,
+        "peak_mem_mb": 0.12,
+        "traced_duration_ms": 205.88,
+        "tracemalloc_overhead_factor": 7.14
+      },
+      "evaluated_severity": "HIGH",
+      "evaluated_score": 60
+    },
+    {
+      "lines": 1000,
+      "payload_kb": 191.18,
+      "pure_cpu": {
+        "min_ms": 297.78,
+        "median_ms": 318.21,
+        "max_ms": 321.83,
+        "median_throughput_lines_sec": 3142.6,
+        "norm_ms": 300.37,
+        "fp_ms": 15.03,
+        "corr_ms": 0.68,
+        "sev_ms": 1.81,
+        "trials": [
+          {
+            "trial": 1,
+            "total_ms": 297.78,
+            "norm_ms": 283.66,
+            "fp_ms": 11.83,
+            "corr_ms": 0.47,
+            "sev_ms": 1.81,
+            "throughput_lines_sec": 3358.2
+          },
+          {
+            "trial": 2,
+            "total_ms": 318.21,
+            "norm_ms": 300.37,
+            "fp_ms": 15.03,
+            "corr_ms": 0.68,
+            "sev_ms": 2.12,
+            "throughput_lines_sec": 3142.6
+          },
+          {
+            "trial": 3,
+            "total_ms": 321.83,
+            "norm_ms": 304.05,
+            "fp_ms": 15.08,
+            "corr_ms": 0.99,
+            "sev_ms": 1.7,
+            "throughput_lines_sec": 3107.3
+          }
+        ]
+      },
+      "memory_profile": {
+        "peak_mem_kb": 1229.9,
+        "peak_mem_mb": 1.2,
+        "traced_duration_ms": 1410.61,
+        "tracemalloc_overhead_factor": 4.43
+      },
+      "evaluated_severity": "HIGH",
+      "evaluated_score": 60
+    },
+    {
+      "lines": 10000,
+      "payload_kb": 1921.53,
+      "pure_cpu": {
+        "min_ms": 2916.23,
+        "median_ms": 3235.02,
+        "max_ms": 3488.74,
+        "median_throughput_lines_sec": 3091.2,
+        "norm_ms": 3112.55,
+        "fp_ms": 131.41,
+        "corr_ms": 6.33,
+        "sev_ms": 14.26,
+        "trials": [
+          {
+            "trial": 1,
+            "total_ms": 3235.02,
+            "norm_ms": 3112.55,
+            "fp_ms": 103.61,
+            "corr_ms": 4.59,
+            "sev_ms": 14.26,
+            "throughput_lines_sec": 3091.2
+          },
+          {
+            "trial": 2,
+            "total_ms": 2916.23,
+            "norm_ms": 2760.77,
+            "fp_ms": 131.41,
+            "corr_ms": 7.69,
+            "sev_ms": 16.35,
+            "throughput_lines_sec": 3429.1
+          },
+          {
+            "trial": 3,
+            "total_ms": 3488.74,
+            "norm_ms": 3330.57,
+            "fp_ms": 138.8,
+            "corr_ms": 6.33,
+            "sev_ms": 13.03,
+            "throughput_lines_sec": 2866.4
+          }
+        ]
+      },
+      "memory_profile": {
+        "peak_mem_kb": 12825.1,
+        "peak_mem_mb": 12.52,
+        "traced_duration_ms": 14645.11,
+        "tracemalloc_overhead_factor": 4.53
+      },
+      "evaluated_severity": "HIGH",
+      "evaluated_score": 60
+    }
+  ]
+}

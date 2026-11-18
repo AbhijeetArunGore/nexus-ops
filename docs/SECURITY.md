@@ -51,3 +51,22 @@ The redaction engine evaluates compiled regular expressions for the following ca
 > 2. Mutual TLS (mTLS) between all microservices.
 > 3. Enterprise Identity Provider (IdP) integration with SAML 2.0 / OIDC and fine-grained Role-Based Access Control (RBAC).
 > 4. Formal third-party penetration testing and PCI Qualified Security Assessor (QSA) audit.
+
+
+---
+
+## 5. Dependency Vulnerability Review (Stage 3.1 Audit)
+
+As part of the Stage 3.1 security verification, an audit of all direct and transitive dependencies was conducted:
+
+### Frontend (`npm audit`)
+- **`picomatch` (<2.3.1 / ReDoS):**
+  - *Context:* Nested transitively inside `vite` -> `rollup` build-time file-watching utilities.
+  - *Exploitability Analysis:* Unreachable from runtime user requests. The file matcher runs only during developer asset bundling on the local developer machine; it does not process untrusted runtime input.
+- **`react-router` (SSR Hydration Warning):**
+  - *Context:* Advisories relate to hydration discrepancies between server-side rendered HTML and client-side DOM reconciliation.
+  - *Exploitability Analysis:* Non-exploitable. NEXUS Ops is architected strictly as a Client-Side Single Page Application (`createBrowserRouter`) with no Node.js SSR rendering tier.
+
+### Backend (`pip`)
+- **FastAPI / Pydantic / SQLAlchemy / Uvicorn:** Pinned to modern, supported versions.
+- **Data Boundary Invariant:** Redaction runs prior to SQLAlchemy commit and prior to generative model prompt packaging, preventing accidental leakage of PAN/CVV tokens into logs or vector stores.
