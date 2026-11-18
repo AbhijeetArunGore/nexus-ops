@@ -1,60 +1,79 @@
-# NEXUS Ops — 7-Minute Product Demonstration Script
-
-> **Product:** NEXUS Ops (Payment Reliability & Incident Intelligence Platform)  
-> **Target Audience:** Engineering Leads, SRE Directors, Principal Architects, Fintech Evaluators
-
----
-
-## Part 1: Problem & System Identity (1 Minute)
-1. **Show:** Operations Overview Dashboard (`/`)
-2. **Talking Points:**
-   - "Good morning. In modern fintech enterprises like Pine Labs, Technology Operations and SRE teams manage millions of critical transactions across microservices, databases, and third-party bank partners."
-   - "During an incident, engineers are inundated with fragmented signals: raw logs, timeouts, and alerting noise. Diagnosing cross-service failures manually is slow and error-prone."
-   - "NEXUS Ops converts raw operational signals into explainable incident intelligence. Our core engineering principle is: **Deterministic Analysis First + Evidence-Grounded AI Reasoning Second**."
-   - "Notice the top banner: **SIMULATED ENVIRONMENT — NO PRODUCTION CONNECTION**. This prototype uses synthetic telemetry inspired by public Pine Labs developer documentation."
+# NEXUS Ops — Technology Operations 10-Minute Demonstration Script
+**Target Audience:** Pine Labs Hiring Panel / Senior Technical Evaluators  
+**Candidate:** Abhijeet Arun Gore  
+**Role:** Technology Operations Intern (Pune)  
+**Total Allocated Time:** 10 minutes live demo + 5–10 minutes technical Q&A  
 
 ---
 
-## Part 2: Payment Reliability Lab Simulation (2 Minutes)
-1. **Navigate to:** `/lab` (Payment Reliability Lab)
-2. **Talking Points:**
-   - "To demonstrate the platform, let's navigate to the Payment Reliability Lab. Here we have modeled 8 realistic payment scenarios: late authorization responses, webhook delivery retries, database connection exhaustion, and acquiring bank latency spikes."
-   - "Let's click **Run Live Simulation** on **Scenario 04: Database Connection Pool Exhaustion & Cascade**."
-   - "Notice what happens: The system is NOT showing hardcoded fake results. It streams the raw logs directly through our backend ingestion, redaction, normalization, fingerprinting, and deterministic severity engines!"
-3. **Action:** Click "Run Live Simulation" on Scenario 04 -> System redirects to the Incident Workspace (`/incidents/<id>`).
+## Part 1: Presentation Outline & Timing (10 Minutes)
+
+```
+[00:00 - 01:30] -> Problem Framing & SRE Philosophy (Why build this?)
+[01:30 - 03:30] -> Live Ingestion & Deterministic Pipeline (Scenario 01 & 04)
+[03:30 - 05:30] -> Grounded AI Investigation & Evidence vs Assumptions
+[05:30 - 07:00] -> Topology Blast Radius & "What Am I Missing?" Telemetry Gaps
+[07:00 - 08:30] -> Ops Knowledge Copilot & Runbook Library Grounding
+[08:30 - 10:00] -> Summary Export, Human Learning Loop & SRE Architecture
+```
 
 ---
 
-## Part 3: Incident Workspace & Deterministic Severity (2 Minutes)
-1. **Show:** Overview Tab
-   - "Notice the incident summary ribbon: Evaluated as **CRITICAL** with Customer Impact **CONFIRMED**."
-   - "How was this severity determined? Scroll down to the **Deterministic Severity Policy Matrix**. We did not ask an LLM to guess a severity. Our deterministic engine evaluated 8 explicit rules: +40 pts for Tier 1 core service impact (`order-db`), +35 pts for customer HTTP 5xx errors, and +30 pts for database pool saturation."
-   - "Every rule displays exact citation links to the supporting events (`EVT-0001`, `EVT-0002`)."
-2. **Show:** Sensitive Data Redaction
-   - "Inspect the Normalized Telemetry Log Stream. Any credit card PAN, CVV, or Bearer token is automatically redacted with `[REDACTED]` before reaching the database or AI layer, preventing PCI-DSS and PII leaks."
-3. **Show:** Reconstructed Timeline Tab
-   - "Click the Timeline tab. The engine automatically tags:
-     - **First Observed Event** (`EVT-0001`: HikariPool active connections 98/100)
-     - **Earliest Underlying Cause** (`EVT-0002`: remaining connection slots reserved)
-     - **First Customer Impact** (`EVT-0005`: Customer checkout payment initiation rejected HTTP 500)."
+## Part 2: Step-by-Step Live Demonstration Walkthrough
+
+### Step 1: Opening & Operations Dashboard (00:00 - 01:30)
+- **Screen:** Open `http://localhost:5173/` (Operations Command Center).
+- **Talking Points:**
+  - *"In high-velocity payment architectures handling millions of daily transactions, an on-call operations engineer is inundated with fragmented, noisy logs when an incident erupts."*
+  - *"Our core philosophy: **Deterministic triage first; AI only to explain and assist.** An LLM should never decide severity or trigger unreviewed destructive actions."*
+  - Point to the **Synthetic Telemetry Workspace** banner: *"Notice that we are completely honest about telemetry provenance. We never claim live production connections."*
+  - Show the balanced dashboard: Critical, High, Medium, and Low incidents with affected payment microservices.
+
+### Step 2: Live Log Ingestion & Drag-and-Drop (01:30 - 03:30)
+- **Screen:** Click **"New Ingestion"** or navigate to `/investigate`.
+- **Action:**
+  - Show both tabs: **Copy-Paste** and **File Upload**.
+  - Click **"Load Sample Pine Labs Gateway Incident"** (Scenario 01: Late Payment Authorization).
+  - Point out the redacting mechanism: show how card numbers (`4111222233334444`), CVVs (`890`), and Bearer tokens are redacted inline *before* persistence.
+  - Click **"Run Deterministic Pipeline"**.
+
+### Step 3: Incident Workspace & Severity Matrix (03:30 - 05:30)
+- **Screen:** Lands directly on the Incident Workspace (`/incidents/:id`).
+- **Talking Points:**
+  - Point to the **Deterministic Severity Matrix** card: *"Notice the mathematical weight calculation (+35 pts for Tier 1, +35 pts for customer ingress timeout). Every single point is backed by observable `EVT-` citations."*
+  - Highlight the **Payment Outcome** distinction: *"A 504 Gateway Timeout on ingress does NOT prove the payment failed or that customer funds were lost. We explicitly classify payment outcome as `AMBIGUOUS` or `PENDING` until ledger confirmation."*
+  - Click **"Trigger AI Analysis"**:
+    - Observe the **Gemini / Deterministic Fallback** provider badge.
+    - Inspect the primary hypothesis: observe the separate columns for **Observed Facts (`EVT-` IDs)**, **Inferences**, **Assumptions**, and **Unknowns**.
+    - Emphasize: *"No guess is presented as confirmed fact. If the AI hallucinates nonexistent IDs, our citation verification layer strips them and flags the hypothesis as speculative."*
+
+### Step 4: Evidence Graph & "What Am I Missing?" (05:30 - 07:00)
+- **Screen:** Click the **"Evidence Graph"** tab, then **"What Am I Missing?"** tab.
+- **Talking Points:**
+  - In Evidence Graph: show the interactive nodes linking `Event -> Hypothesis -> Recommendation -> Runbook`.
+  - In "What Am I Missing?": *"Junior engineers often suffer from confirmation bias—finding one error and declaring root cause. Our system acts as an adversarial devil's advocate, identifying blindspots: e.g., 'Did we verify whether acquiring partner circuit breakers tripped?' or 'Are database connections leaking in idle transactions?'"*
+
+### Step 5: Ops Knowledge Copilot & Runbooks (07:00 - 08:30)
+- **Screen:** Click **"Ops Copilot"** tab or left-nav Copilot.
+- **Action:**
+  - Switch between **Learning Mode** (for junior L1 ops) and **Engineering Mode** (for senior SREs).
+  - Ask: *"What is an HTTP 504 Gateway Timeout and how does it differ from a failed payment?"*
+  - Show the response: grounded in local SRE runbooks (`RB-PAY-001`) with suggested diagnostic queries (`pg_stat_activity`, p99 latency checks).
+  - Click the linked runbook to open the operational procedure.
+
+### Step 6: Shareable Summary Export & Conclusion (08:30 - 10:00)
+- **Screen:** Click **"Export Summary"** button in header.
+- **Action:**
+  - Switch between **Markdown**, **JSON**, and **Slack** formats.
+  - Show the 1-click **"Copy to Clipboard"** and **"Download File"**.
+  - Show how the Slack summary contains bold severity, time windows, evidence codes, and immediate next steps ready for on-call bridges.
+  - Conclude: *"NEXUS Ops demonstrates that AI can be responsibly integrated into fintech operations by enforcing mathematical determinism, transparent evidentiary grounding, and human-in-the-loop safety."*
 
 ---
 
-## Part 4: Evidence Graph & Blast Radius (1 Minute)
-1. **Show:** Blast Radius Tab
-   - "In distributed payment systems, a database failure causes cascading latency. Our Blast Radius Analyzer traverses the service dependency DAG in NetworkX."
-   - "It cleanly separates **OBSERVED IMPACT** (`order-db`, `payment-orchestrator`, `payment-api`) from **POTENTIAL BLAST RADIUS** (upstream services exposed to timeout propagation)."
-2. **Show:** Evidence Graph Tab
-   - "Click Evidence Graph. Here we see the **Bipartite Attribution Graph**: AI Hypotheses linked to verifiable Ingested Event IDs, triggering Mitigations and Runbooks."
-   - "If an LLM attempts to hallucinate an event citation that does not exist in the ingested logs, our citation validator strips it automatically."
+## Part 3: Offline Demonstration Fallback Plan
 
----
-
-## Part 5: 'What Am I Missing?' & Ops Copilot (1 Minute)
-1. **Show:** 'What Am I Missing?' Tab
-   - "Engineers frequently suffer from confirmation bias. We built the **'What Am I Missing?'** adversarial audit engine. It challenges the diagnosis, highlights unexamined failure modes (e.g. database locks vs slow queries), and audits telemetry blindspots."
-2. **Show:** Ops Knowledge Copilot Tab
-   - "Finally, our embedded Ops Copilot features a **Dual Explanation Engine**."
-   - "In **LEARNING Mode**, it explains concepts like 504 Gateway Timeouts, connection pools, and idempotency to junior engineers using clear analogies."
-   - "In **ENGINEERING Mode**, it provides senior SREs with precise PostgreSQL `pg_stat_activity` diagnostic queries and circuit-breaker tuning advice."
-3. **Conclusion:** "NEXUS Ops demonstrates how deterministic engineering and grounded AI work together to deliver reliable, explainable, and secure payment operations."
+If live internet connectivity or Gemini API rate limits fail during the interview:
+1. **Zero-Configuration Fallback:** The application automatically falls back to `DeterministicFallbackProvider`.
+2. **Provider Transparency:** The UI displays `Deterministic Offline Fallback (Rule-Based Heuristic)`.
+3. **Identical Contract:** All hypotheses, evidence codes, runbooks, and export formats generate synchronously with 0ms external latency.

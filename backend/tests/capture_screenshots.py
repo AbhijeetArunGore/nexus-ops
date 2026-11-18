@@ -121,8 +121,8 @@ def capture_all_screenshots():
             # -------------------------------------------------------------
             print("[3/6] Capturing Incident Workspace...")
             page.goto(f"{FRONTEND_URL}/incidents/{incident_id}")
-            page.wait_for_selector("text=CRITICAL")
-            page.wait_for_timeout(1000)
+            page.wait_for_selector("h1")
+            page.wait_for_timeout(1500)
             page.screenshot(path=os.path.join(OUTPUT_DIR, "03_incident_workspace.png"))
             print("  -> Saved docs/assets/screenshots/03_incident_workspace.png")
 

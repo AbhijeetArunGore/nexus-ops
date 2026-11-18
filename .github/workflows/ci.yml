@@ -1,0 +1,63 @@
+name: NEXUS Ops CI & Quality Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    name: Backend Regression & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest pytest-cov
+
+      - name: Run Test Suite
+        env:
+          DATABASE_URL: sqlite:///./ci_test.db
+          LLM_PROVIDER: deterministic_fallback
+        run: |
+          python -m pytest backend/tests/test_api.py backend/tests/test_core.py backend/tests/test_scenarios.py backend/tests/test_golden_scenarios.py -v --cov=backend/app --cov-report=term-missing
+
+      - name: Evaluate AI Provider & Grounding Quality
+        run: |
+          python backend/tests/evaluate_ai_quality.py
+
+  frontend-build:
+    name: Frontend Typecheck & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: TypeScript Typecheck
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Production Vite Build
+        working-directory: frontend
+        run: npm run build
