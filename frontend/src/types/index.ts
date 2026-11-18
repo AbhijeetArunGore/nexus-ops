@@ -1,6 +1,7 @@
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type IncidentStatus = 'OPEN' | 'INVESTIGATING' | 'MITIGATED' | 'RESOLVED' | 'CLOSED';
 export type CustomerImpact = 'CONFIRMED' | 'SUSPECTED' | 'UNKNOWN';
+export type PaymentOutcome = 'AUTHORIZATION_REQUESTED' | 'AUTHORIZED' | 'CAPTURED' | 'DECLINED' | 'FAILED' | 'PENDING' | 'AMBIGUOUS' | 'UNKNOWN';
 
 export interface SeverityRationaleItem {
   rule: string;
@@ -16,6 +17,7 @@ export interface IncidentSummary {
   severity: Severity;
   status: IncidentStatus;
   customer_impact: CustomerImpact;
+  payment_outcome?: PaymentOutcome;
   source_scenario?: string | null;
   created_at: string;
   updated_at: string;
@@ -88,6 +90,9 @@ export interface Hypothesis {
   confidence: 'HIGH' | 'MEDIUM' | 'LOW';
   supporting_evidence_codes: string[];
   contradicting_evidence_codes: string[];
+  assumptions?: string[];
+  inferences?: string[];
+  unknowns?: string[];
   verification_steps: string[];
   is_primary: boolean;
 }

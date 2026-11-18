@@ -12,7 +12,40 @@ export const LogInvestigator: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Pre-load a sample Pine Labs log
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
+      const validExts = ['.log', '.txt', '.json', '.jsonl', '.csv'];
+      const hasValidExt = validExts.some(ext => droppedFile.name.toLowerCase().endsWith(ext));
+      if (!hasValidExt) {
+        setErrorMsg(`Unsupported file type '${droppedFile.name}'. Permitted formats: .log, .txt, .json, .jsonl, .csv`);
+        return;
+      }
+      if (droppedFile.size > 10 * 1024 * 1024) {
+        setErrorMsg(`File exceeds maximum permitted size of 10MB.`);
+        return;
+      }
+      setErrorMsg(null);
+      setFile(droppedFile);
+    }
+  };
   const loadSample = () => {
     setTitle("Bank Gateway Degradation & Connection Timeout");
     setPasteContent(`2026-11-18T10:00:00.120Z [payment-api] INFO POST /payments/v1/order txn_id=SYN-TXN-8801 amount=3400.00 currency=INR
@@ -215,7 +248,14 @@ export const LogInvestigator: React.FC = () => {
               />
             </div>
 
-            <div className="border-2 border-dashed border-gray-800 hover:border-blue-500/50 rounded-xl p-10 text-center transition cursor-pointer bg-gray-900/40">
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-xl p-10 text-center transition cursor-pointer ${
+                isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 hover:border-blue-500/50 bg-gray-900/40'
+              }`}
+            >
               <input
                 type="file"
                 id="file-upload"

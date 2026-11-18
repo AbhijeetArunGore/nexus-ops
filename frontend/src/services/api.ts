@@ -132,6 +132,13 @@ export const api = {
     return res.json();
   },
 
+  // Export Incident Report
+  exportIncident: async (id: string, format: 'markdown' | 'json' | 'slack' = 'markdown'): Promise<any> => {
+    const res = await fetch(`${API_BASE}/incidents/${id}/export?format=${format}`);
+    if (!res.ok) throw new Error('Failed to export incident summary');
+    return res.json();
+  },
+
   // Scenarios
   listScenarios: async (): Promise<ScenarioMeta[]> => {
     const res = await fetch(`${API_BASE}/scenarios`);

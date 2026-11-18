@@ -161,3 +161,30 @@ def test_runbooks_endpoint(client):
     assert resp_filter.status_code == 200
     filtered = resp_filter.json()
     assert any("database" in r["title"].lower() for r in filtered)
+
+
+def test_incident_export_endpoint(client):
+    """Test incident summary export in Markdown, JSON, and Slack formats."""
+    # 1. Ingest incident
+    payload = {
+        "content": "2026-11-18T10:00:00Z [payment-api] ERROR HTTP 504 Gateway Timeout txn_id=SYN-TXN-EXPORT-1",
+        "title": "Export Test Incident"
+    }
+    create_resp = client.post("/api/v1/analyses/paste", json=payload)
+    inc_id = create_resp.json()["id"]
+
+    # 2. Markdown export
+    resp_md = client.get(f"/api/v1/incidents/{inc_id}/export?format=markdown")
+    assert resp_md.status_code == 200
+    assert "Incident Summary" in resp_md.json()["content"]
+
+    # 3. JSON export
+    resp_json = client.get(f"/api/v1/incidents/{inc_id}/export?format=json")
+    assert resp_json.status_code == 200
+    assert resp_json.json()["incident_number"].startswith("INC-2026-")
+    assert "likely_cause" in resp_json.json()
+
+    # 4. Slack export
+    resp_slack = client.get(f"/api/v1/incidents/{inc_id}/export?format=slack")
+    assert resp_slack.status_code == 200
+    assert ":warning:" in resp_slack.json()["content"]

@@ -34,10 +34,46 @@ export const IncidentWorkspace: React.FC = () => {
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [investigating, setInvestigating] = useState(false);
 
+  // Export states
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json' | 'slack'>('markdown');
+  const [exportContent, setExportContent] = useState<string>('');
+  const [copySuccess, setCopySuccess] = useState(false);
+
   // Audit / Feedback states
   const [verifiedCause, setVerifiedCause] = useState('');
   const [accuracy, setAccuracy] = useState<'VERIFIED' | 'PARTIAL' | 'REJECTED'>('VERIFIED');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  const handleExport = async (format: 'markdown' | 'json' | 'slack') => {
+    if (!id) return;
+    setExportFormat(format);
+    try {
+      const res = await api.exportIncident(id, format);
+      const text = format === 'json' ? JSON.stringify(res, null, 2) : res.content;
+      setExportContent(text);
+      setExportModalOpen(true);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCopyExport = () => {
+    navigator.clipboard.writeText(exportContent);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const handleDownloadExport = () => {
+    const ext = exportFormat === 'json' ? 'json' : (exportFormat === 'slack' ? 'txt' : 'md');
+    const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${incident?.incident_number || 'incident'}_summary.${ext}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const loadIncident = async () => {
     if (!id) return;
@@ -232,6 +268,15 @@ export const IncidentWorkspace: React.FC = () => {
             >
               <Sparkles className={`w-3.5 h-3.5 ${investigating ? 'animate-spin' : ''}`} />
               {investigating ? 'Investigating...' : 'Trigger AI Analysis'}
+            </button>
+
+            <button
+              onClick={() => handleExport('markdown')}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-200 rounded text-xs font-mono hover:bg-gray-700 transition"
+              title="Export shareable incident summary report"
+            >
+              <FileDown className="w-3.5 h-3.5 text-blue-400" />
+              Export Summary
             </button>
           </div>
         </div>
@@ -1018,6 +1063,76 @@ export const IncidentWorkspace: React.FC = () => {
               </span>
             )}
           </form>
+        </div>
+      )}
+
+      {/* Export Shareable Summary Modal */}
+      {exportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-[#111827] border border-gray-800 rounded-xl max-w-3xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FileDown className="w-5 h-5 text-blue-400" />
+                <h3 className="text-sm font-bold text-white font-mono uppercase">
+                  Shareable Incident Summary ({exportFormat.toUpperCase()})
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleExport('markdown')}
+                  className={`px-2.5 py-1 text-xs font-mono rounded ${exportFormat === 'markdown' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}
+                >
+                  Markdown
+                </button>
+                <button
+                  onClick={() => handleExport('json')}
+                  className={`px-2.5 py-1 text-xs font-mono rounded ${exportFormat === 'json' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}
+                >
+                  JSON
+                </button>
+                <button
+                  onClick={() => handleExport('slack')}
+                  className={`px-2.5 py-1 text-xs font-mono rounded ${exportFormat === 'slack' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}
+                >
+                  Slack
+                </button>
+                <button
+                  onClick={() => setExportModalOpen(false)}
+                  className="text-gray-400 hover:text-white text-sm ml-2 font-mono px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <textarea
+              readOnly
+              rows={14}
+              value={exportContent}
+              className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-xs font-mono text-gray-200 focus:outline-none resize-none leading-relaxed"
+            />
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-[11px] font-mono text-gray-500">
+                Ready for on-call bridge, postmortem archive, or Slack notification.
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleCopyExport}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-xs font-mono font-semibold transition"
+                >
+                  {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
+                </button>
+                <button
+                  onClick={handleDownloadExport}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-mono font-semibold transition flex items-center gap-1.5"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  Download File
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -54,6 +54,7 @@ def list_incidents(
             severity=inc.severity,
             status=inc.status,
             customer_impact=inc.customer_impact,
+            payment_outcome=inc.payment_outcome or "UNKNOWN",
             source_scenario=inc.source_scenario,
             created_at=inc.created_at,
             updated_at=inc.updated_at,
@@ -84,6 +85,7 @@ def get_incident_detail(incident_id: str, db: Session = Depends(get_db)):
         severity=inc.severity,
         status=inc.status,
         customer_impact=inc.customer_impact,
+        payment_outcome=inc.payment_outcome or "UNKNOWN",
         source_scenario=inc.source_scenario,
         created_at=inc.created_at,
         updated_at=inc.updated_at,
@@ -361,3 +363,98 @@ def get_postmortem(incident_id: str, db: Session = Depends(get_db)):
         "action_items": pm.action_items,
         "generated_at": pm.generated_at
     }
+
+
+@router.get("/{incident_id}/export")
+def export_incident(incident_id: str, format: str = Query("markdown", pattern="^(markdown|json|slack)$"), db: Session = Depends(get_db)):
+    """
+    Exports a concise, professional incident summary report formatted for engineering,
+    operations, Slack bridge communication, or archival.
+    """
+    inc = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found.")
+
+    events = inc.events
+    error_count = sum(1 for e in events if e.log_level in ["WARN", "ERROR", "CRITICAL"] or e.error_type)
+    affected_services = sorted(list({e.service for e in events}))
+    primary_h = next((h for h in inc.hypotheses if h.is_primary), None)
+    lead_cause = primary_h.title if primary_h else "Under Investigation"
+    lead_desc = primary_h.description if primary_h else "Deterministic triage completed. Awaiting AI hypothesis verification."
+    citations = primary_h.supporting_evidence_codes if primary_h else []
+    assumptions = primary_h.assumptions if primary_h else []
+
+    top_recommendations = [
+        f"{r.priority}. {r.action} (Runbook: {r.associated_runbook_id or 'General'})"
+        for r in sorted(inc.recommendations, key=lambda x: x.priority)[:3]
+    ]
+
+    time_window = "Instantaneous"
+    valid_ts = [e.timestamp for e in events if e.timestamp]
+    if valid_ts:
+        time_window = f"{min(valid_ts).isoformat()} to {max(valid_ts).isoformat()}"
+
+    if format == "json":
+        return {
+            "incident_number": inc.incident_number,
+            "title": inc.title,
+            "severity": inc.severity,
+            "status": inc.status,
+            "customer_impact": inc.customer_impact,
+            "payment_outcome": inc.payment_outcome or "UNKNOWN",
+            "time_window": time_window,
+            "affected_services": affected_services,
+            "total_events": len(events),
+            "total_errors": error_count,
+            "likely_cause": {
+                "title": lead_cause,
+                "description": lead_desc,
+                "supporting_evidence": citations,
+                "assumptions": assumptions
+            },
+            "recommendations": top_recommendations,
+            "summary": inc.summary or lead_desc,
+            "provenance": "NEXUS Ops Deterministic Engine + Fallback Grounding (Synthetic Simulation)"
+        }
+
+    elif format == "slack":
+        slack_text = (
+            f":warning: *[{inc.severity}] {inc.incident_number}: {inc.title}*\n"
+            f">*Status:* `{inc.status}` | *Customer Impact:* `{inc.customer_impact}` | *Payment State:* `{inc.payment_outcome}`\n"
+            f">*Affected Services:* {', '.join(affected_services) or 'None'}\n"
+            f">*Time Window:* {time_window}\n"
+            f">*Likely Cause:* {lead_cause}\n"
+            f">*Evidence Grounding:* {', '.join(citations) or 'Speculative (No direct EVT citations)'}\n"
+            f">*Immediate Next Steps:*\n" + "\n".join(f"> • {rec}" for rec in top_recommendations) + "\n"
+            f">*Dispatched from:* NEXUS Ops Incident Intelligence (Simulated Environment)"
+        )
+        return {"format": "slack", "content": slack_text}
+
+    else:
+        # Default: Markdown
+        md_content = f"""# Incident Summary: {inc.incident_number} — {inc.title}
+**Dispatched:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}  
+**Environment:** Simulated Pine Labs Payment Mesh  
+**Severity:** `{inc.severity}` | **Status:** `{inc.status}` | **Customer Impact:** `{inc.customer_impact}` | **Payment Outcome:** `{inc.payment_outcome}`
+
+---
+
+### 1. Executive Overview
+- **Incident Number:** `{inc.incident_number}`
+- **Affected Services:** {', '.join(affected_services) or 'None'}
+- **Total Observed Events:** {len(events)} ({error_count} error / warning lines)
+- **Time Window:** {time_window}
+
+### 2. Evidence-Supported Likely Cause
+- **Hypothesis:** **{lead_cause}**
+- **Description:** {lead_desc}
+- **Supporting Event Citations:** {', '.join(citations) if citations else 'None (Hypothesis requires manual on-call verification)'}
+- **Assumptions:** {', '.join(assumptions) if assumptions else 'Standard operating assumptions'}
+
+### 3. Immediate Action & Troubleshooting Steps
+{chr(10).join(f"- {rec}" for rec in top_recommendations) if top_recommendations else "- Inspect logs for affected service pods."}
+
+---
+*Generated by NEXUS Ops — Payment Reliability & Incident Intelligence Platform*
+"""
+        return {"format": "markdown", "content": md_content}

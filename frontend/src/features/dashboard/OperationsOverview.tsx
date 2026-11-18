@@ -63,12 +63,12 @@ export const OperationsOverview: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
             Operations Command Center
-            <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
-              LIVE TELEMETRY
+            <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              SYNTHETIC TELEMETRY WORKSPACE
             </span>
           </h1>
           <p className="text-sm text-gray-400 mt-1">
-            Real-time fintech telemetry, payment lifecycle monitoring, and deterministic incident intelligence.
+            Simulated fintech payment lifecycle telemetry, topology analysis, and deterministic incident intelligence.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -166,7 +166,7 @@ export const OperationsOverview: React.FC = () => {
                 <div className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
                   svc.ok ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50' : 'bg-red-950/80 text-red-400 border border-red-800/80 animate-pulse'
                 }`}>
-                  {svc.ok ? 'OPERATIONAL' : 'DEGRADED'}
+                  {svc.ok ? 'NO OPEN INCIDENT' : 'ACTIVE INCIDENT ALERT'}
                 </div>
               </div>
             ))}
