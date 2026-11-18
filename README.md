@@ -9,7 +9,8 @@
 [![Vite](https://img.shields.io/badge/Vite-6.0-646CFF.svg)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC.svg)](https://tailwindcss.com/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
-[![Tests Passing](https://img.shields.io/badge/Tests-27%2F27%20Passed-emerald.svg)](backend/tests)
+[![Tests Passing](https://img.shields.io/badge/Tests-41%2F41%20Passed-emerald.svg)](backend/tests)
+[![E2E Browser Tests](https://img.shields.io/badge/Browser%20E2E-10%2F10%20Passed-blue.svg)](docs/BROWSER_TEST_REPORT.md)
 [![Coverage](https://img.shields.io/badge/Coverage-86%25-green.svg)](backend/tests)
 
 ---

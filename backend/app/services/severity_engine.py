@@ -47,7 +47,14 @@ def evaluate_severity(events: List[Dict[str, Any]], patterns: List[Dict[str, Any
     client_5xx = [
         e for e in error_events
         if e.get("service") in ["payment-api", "customer-checkout"]
-        and (((e.get("http_status") or 0) >= 500) or "504" in e.get("message", "") or "500" in e.get("message", ""))
+        and (
+            ((e.get("http_status") or 0) >= 500)
+            or "http 500" in e.get("message", "").lower()
+            or "http 504" in e.get("message", "").lower()
+            or " 500 " in e.get("message", "")
+            or " 504 " in e.get("message", "")
+            or "gateway timeout" in e.get("message", "").lower()
+        )
     ]
     if client_5xx:
         score += 35

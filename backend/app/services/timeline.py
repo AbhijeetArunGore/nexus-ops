@@ -40,7 +40,16 @@ def reconstruct_timeline(events: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     # Identify first customer impact (payment-api or customer-checkout receiving 5xx or timeout)
     for evt in sorted_events:
-        if evt.get("service") in ["payment-api", "customer-checkout"] and (evt.get("http_status", 0) >= 500 or "timeout" in evt.get("message", "").lower()):
+        http_st = evt.get("http_status") or 0
+        msg_lower = evt.get("message", "").lower()
+        if evt.get("service") in ["payment-api", "customer-checkout"] and (
+            http_st >= 500
+            or "timeout" in msg_lower
+            or "http 500" in msg_lower
+            or "http 504" in msg_lower
+            or " 500 " in msg_lower
+            or " 504 " in msg_lower
+        ):
             first_customer_impact = evt
             break
 

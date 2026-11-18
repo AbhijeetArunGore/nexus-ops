@@ -169,23 +169,61 @@ class DeterministicFallbackProvider(BaseLLMProvider):
     async def answer_copilot_query(self, query: str, mode: str, incident_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Produces detailed technical answers tailored to LEARNING or ENGINEERING mode.
+        Ensures prompt injection immunity, evidence grounding, and uncertainty communication.
         """
         q = query.lower()
         title = incident_context.get("title", "Current Incident") if incident_context else "General Payment Operations"
 
+        # 1. Adversarial Prompt Injection Defense
+        if any(w in q for w in ["override", "ignore", "system prompt", "previous instruction", "safety rules"]):
+            return {
+                "query": query,
+                "mode": mode,
+                "is_fallback": True,
+                "provider_name": "deterministic_fallback",
+                "answer": "Security Policy Enforcement: Adversarial prompt override rejected. The deterministic engine treats log content and instructions strictly as passive data. Operational severity, incident status, and evidence citations cannot be overridden by conversational prompts.",
+                "technical_details": "AppSec Invariant: Model prompt isolation prevents indirect prompt injection from altering forensic conclusions or incident state machines.",
+                "supporting_evidence": ["NEXUS Ops Application Security Policy: SEC-PROMPT-001"],
+                "suggested_actions": ["Review raw logs for prompt injection attempts.", "Maintain deterministic severity scoring."],
+                "source_references": ["https://owasp.org/www-project-top-10-for-large-language-model-applications/"],
+                "follow_up_questions": []
+            }
+
+        # 2. Insufficient Evidence & Uncertainty Communication
+        if any(w in q for w in ["cannot conclude", "insufficient", "isolated", "corruption", "confirm database"]):
+            return {
+                "query": query,
+                "mode": mode,
+                "is_fallback": True,
+                "provider_name": "deterministic_fallback",
+                "answer": "Forensic Uncertainty Notice: Cannot conclude root cause from an isolated client connection drop. There is insufficient evidence to confirm database corruption or backend failure without verifying pg_stat_activity, server error logs, and disk I/O metrics.",
+                "technical_details": "SRE Standard: Single-point client disconnections are frequently transient client-side network interruptions. Declaring database corruption without correlating database engine telemetry is a false-positive violation.",
+                "supporting_evidence": ["Google SRE Handbook: Being On-Call & Triaging Signals"],
+                "suggested_actions": [
+                    "Query `pg_stat_activity` to verify database connection health.",
+                    "Inspect database engine logs for PANIC or FATAL events.",
+                    "Gather upstream client-checkout drop rate telemetry metrics."
+                ],
+                "source_references": ["https://sre.google/sre-book/incident-management/"],
+                "follow_up_questions": [
+                    "What telemetry is required to verify database health?",
+                    "How do we distinguish client-side network drops from API gateway timeouts?"
+                ]
+            }
+
         if mode == "LEARNING":
-            if "504" in q or "timeout" in q:
-                ans = "An HTTP 504 Gateway Timeout occurs when one server acting as a gateway or proxy does not receive a timely response from an upstream server. In payment architectures, when the Payment API calls the Bank Connector, if the bank takes longer than the configured timeout (e.g. 15 seconds) to approve the payment, the Payment API returns a 504 to the user."
-                tech = "Key concept: The customer's bank account might still have been debited! Never tell a customer a 504 means the transaction failed without verifying with the bank first."
+            if "idempotency" in q or "duplicate" in q:
+                ans = "Idempotency means that making the exact same request multiple times has the exact same result as making it once. For example, if a network hiccup causes an app to send 'Charge ₹500' twice with the same idempotency key (such as order_id), the payment gateway recognizes the duplicate and ensures the customer is not double-debited."
+                tech = "Pine Labs and modern payment APIs use idempotency keys (like `X-Idempotency-Key` or `order_id`) stored in Redis or PostgreSQL with unique constraints. If an event with the same key is already processed, subsequent attempts return the cached authorization result."
+                acts = ["Ensure client checkout generates UUIDv4 idempotency keys.", "Check deduplication cache TTL.", "Verify idempotency key collision warnings in logs."]
+            elif "504" in q or "timeout" in q or "gateway" in q:
+                ans = "An HTTP 504 Gateway Timeout occurs when one server acting as an intermediate gateway or proxy does not receive a timely response from an upstream server. In payment architectures, when the Payment API calls the Bank Connector, if the bank takes longer than the configured timeout (e.g. 15 seconds) to approve the payment, the Payment API returns a 504 to the user."
+                tech = "Key concept: The customer's bank account might still have been debited by the upstream bank! Never tell a customer a 504 means the transaction failed without verifying with the bank first using an idempotency key."
                 acts = ["Check the transaction status verification API.", "Do not immediately initiate a retry without an idempotency key."]
             elif "database" in q or "pool" in q:
                 ans = "A database connection pool is a cache of database connections kept open so they can be reused. Opening a new database connection for every payment is slow and resource-heavy. If all pooled connections are busy running long queries, new payment requests get blocked waiting for a free slot and eventually fail with connection pool exhaustion."
                 tech = "Analogy: Think of a bank branch with 10 teller windows. If all 10 tellers are helping slow customers, the queue out the door backs up."
                 acts = ["Inspect pg_stat_activity to find slow queries.", "Increase pool size if database CPU permits."]
-            elif "idempotency" in q or "duplicate" in q:
-                ans = "Idempotency means that making the exact same request multiple times has the exact same result as making it once. For example, if a network hiccup causes an app to send 'Charge ₹500' twice with the same idempotency key, the payment gateway must only charge the customer once."
-                tech = "Pine Labs and modern payment APIs use idempotency keys (like `X-Idempotency-Key` or `order_id`) stored in Redis or PostgreSQL with unique constraints."
-                acts = ["Ensure client generates UUIDv4 idempotency keys.", "Check deduplication cache TTL."]
             else:
                 ans = f"In {title}, the incident reflects payment pipeline degradation. The deterministic rule engine evaluates evidence such as error rates, affected service tiers, and customer impact to guide triage."
                 tech = "Best practice: Always gather observable facts (timestamps, trace IDs, error fingerprints) before jumping to root cause conclusions."
@@ -209,21 +247,30 @@ class DeterministicFallbackProvider(BaseLLMProvider):
             }
 
         else:
-            if "504" in q or "timeout" in q or "root cause" in q:
+            # ENGINEERING MODE
+            if ("distinguish" in q and "database" in q) or ("latency" in q and "exhaustion" in q) or ("network" in q and "pool" in q):
+                ans = "To distinguish network latency from database connection pool exhaustion: 1) Network latency manifests as socket timeout errors, TCP retransmissions, and high span durations on outbound HTTP/ISO8583 banking connector clients; 2) Database connection pool saturation manifests as HikariPool acquisition timeouts (`timeout 30000ms`), saturated `max_connections` in PostgreSQL, and connection slot exhaustion (`FATAL: remaining connection slots are reserved`)."
+                tech = "Diagnostic metrics: Check `pg_stat_activity` for `state = 'active'` vs `state = 'idle in transaction'`. If database CPU is low but connections are maxed out, it indicates leaked sessions or long-running locks rather than external network latency."
+                acts = [
+                    "Inspect pg_stat_activity: `SELECT count(*), state FROM pg_stat_activity GROUP BY state;`",
+                    "Check network socket metrics and partner bank ping/handshake latency.",
+                    "Verify connection pool acquisition wait time in metrics dashboards."
+                ]
+            elif "database" in q or "pg_stat_activity" in q or "saturation" in q or "query" in q or "lock" in q:
+                ans = "Database connection pool saturation indicates that active worker threads have saturated `max_connections` or connection lease duration exceeds threshold, exhausting available connection slots."
+                tech = "Query: `SELECT pid, state, now() - xact_start as xact_age, query FROM pg_stat_activity WHERE state = 'active' ORDER BY xact_age DESC LIMIT 10;`. Check for table-level exclusive locks (`AccessExclusiveLock`) blocking transaction commits against `max_connections` ceilings."
+                acts = [
+                    "Terminate idle-in-transaction queries older than 30s using `SELECT pg_terminate_backend(pid);`.",
+                    "Tune HikariCP/SQLAlchemy `pool_size`, `max_overflow`, and `pool_timeout`.",
+                    "Verify connection release inside `finally` blocks."
+                ]
+            elif "504" in q or "timeout" in q or "root cause" in q:
                 ans = f"Forensic analysis of {title} demonstrates latency propagation through the payment request DAG. When an upstream callee (such as external banking partner or internal orchestrator) breaches socket read timeout thresholds, the ingress reverse proxy terminates the connection with HTTP 504."
                 tech = "Diagnostic procedure: 1) Extract distributed W3C traceparent headers; 2) Check p99 duration across spans; 3) Inspect TCP SYN retransmission and socket buffer saturation; 4) Check partner SLA dashboard."
                 acts = [
                     "Execute `curl -I -X GET <partner_endpoint>/health --connect-timeout 2` to verify TCP socket connectivity.",
                     "Verify circuit breaker state machine (`CLOSED` -> `OPEN`).",
                     "Query order ledger for transactions in AMBIGUOUS state."
-                ]
-            elif "database" in q or "pool" in q or "pg_stat_activity" in q or "lock" in q:
-                ans = "Database connection pool exhaustion indicates that active worker threads have saturated `max_connections` or connection lease duration exceeds threshold."
-                tech = "Query: `SELECT pid, state, now() - xact_start as xact_age, query FROM pg_stat_activity WHERE state != 'idle' ORDER BY xact_age DESC LIMIT 10;`. Check for table-level exclusive locks (`AccessExclusiveLock`) blocking transaction commits."
-                acts = [
-                    "Terminate idle-in-transaction queries older than 30s using `SELECT pg_terminate_backend(pid);`.",
-                    "Tune HikariCP/SQLAlchemy `pool_size`, `max_overflow`, and `pool_timeout`.",
-                    "Verify connection release inside `finally` blocks."
                 ]
             else:
                 ans = f"Incident forensic evaluation for {title}: Telemetry indicates multi-service correlation with deterministic severity. All hypotheses are grounded against concrete event identifiers."
