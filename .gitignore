@@ -1,15 +1,36 @@
-# Environment Variables
-.env
-*.env
-!.env.example
+# ==============================================================================
+# NEXUS Ops — Git Ignore Rules (Security Hardened)
+# ==============================================================================
 
-# Python
+# Secrets, Environment Files & Keys
+.env
+.env.*
+!.env.example
+*.env
+*.key
+*.pem
+*.cert
+*.crt
+*.pfx
+*.p12
+*.pkcs12
+*service-account*.json
+*credentials*.json
+id_rsa
+id_ecdsa
+id_ed25519
+*.bundle
+gitleaks_report*.json
+
+# Python & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 env/
+venv/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -30,8 +51,9 @@ wheels/
 htmlcov/
 nexus_ops.db
 *.sqlite3
+backend/nexus_ops.db
 
-# Node / Frontend
+# Node / Frontend Build Artifacts
 node_modules/
 frontend/dist/
 frontend/build/
@@ -39,9 +61,14 @@ frontend/build/
 .eslintcache
 *.tsbuildinfo
 
-# OS / Editor
+# Application & Debug Logs
+*.log
+debug.log
+
+# Operating System & Editor Artifacts
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.swp
+*.swo

@@ -1,0 +1,18 @@
+# ==============================================================================
+# NEXUS Ops — Gitleaks Security Scanner Configuration
+# ==============================================================================
+# Extends default Gitleaks detector rules (160+ secret types) while scoping
+# allowlists strictly to synthetic unit test fixtures and template files.
+# ==============================================================================
+
+title = "NEXUS Ops Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for synthetic unit test fixtures and documentation templates"
+paths = [
+    '''backend/tests/test_core\.py''',
+    '''\.env\.example$'''
+]
